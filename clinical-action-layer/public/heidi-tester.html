@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heidi API Tester</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        select, button {
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+        select {
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 15px;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        button:hover {
+            background: #0052a3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 20px;
+            margin-top: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .transcript {
+            white-space: pre-wrap;
+            line-height: 1.6;
+            color: #333;
+        }
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .loading {
+            color: #0066cc;
+            font-weight: 600;
+        }
+        .info {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .meta {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏥 Heidi API Tester</h1>
+        <p class="subtitle">Test transcript fetching with hackathon session IDs</p>
+
+        <div class="info">
+            <strong>📋 Available Sessions:</strong> 8 sessions provided by hackathon organizers
+        </div>
+
+        <div class="section">
+            <label for="sessionSelect"><strong>Select a Session:</strong></label>
+            <select id="sessionSelect">
+                <option value="">-- Choose a session --</option>
+                <option value="337851254565527952685384877024185083869">Session 1: 337851254565527952685384877024185083869</option>
+                <option value="750333248699968106772992654159342594770">Session 2: 750333248699968106772992654159342594770</option>
+                <option value="209429578973190336673242710141917128963">Session 3: 209429578973190336673242710141917128963</option>
+                <option value="316272209747326581157737075663692625433">Session 4: 316272209747326581157737075663692625433</option>
+                <option value="483297810582323025582777956703408080822">Session 5: 483297810582323025582777956703408080822</option>
+                <option value="189878368687884891206528465309407076433">Session 6: 189878368687884891206528465309407076433</option>
+                <option value="179340005192510878551324680590964837821">Session 7: 179340005192510878551324680590964837821</option>
+                <option value="535873167906829714469358805153241006567">Session 8: 535873167906829714469358805153241006567</option>
+            </select>
+            
+            <div style="display: flex; gap: 10px;">
+                <button id="createBtn" onclick="createDocument()" style="flex: 1; background: #28a745;">📝 Create Document First</button>
+                <button id="fetchBtn" onclick="fetchTranscript()" style="flex: 1;">🔍 Fetch Transcript</button>
+            </div>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function createDocument() {
+            const sessionId = document.getElementById('sessionSelect').value;
+            const resultDiv = document.getElementById('result');
+            const createBtn = document.getElementById('createBtn');
+            
+            if (!sessionId) {
+                resultDiv.innerHTML = '<div class="result error">Please select a session first!</div>';
+                return;
+            }
+
+            createBtn.disabled = true;
+            resultDiv.innerHTML = '<div class="result loading">⏳ Creating document for session (this may take 10-30 seconds)...</div>';
+
+            try {
+                const response = await fetch('/api/heidi/create-document', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ sessionId }),
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.data) {
+                    resultDiv.innerHTML = `
+                        <div class="result">
+                            <h3>✅ Document Created!</h3>
+                            <p>${data.message}</p>
+                            <div class="meta">
+                                <strong>Document ID:</strong> ${data.data.id}<br>
+                                <strong>Name:</strong> ${data.data.name || 'N/A'}<br>
+                                <strong>Content Type:</strong> ${data.data.content_type}<br>
+                            </div>
+                            <p style="margin-top: 15px; padding: 10px; background: #e7f3ff; border-radius: 6px;">
+                                💡 Now click "Fetch Transcript" to get the content!
+                            </p>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <h3>❌ Error</h3>
+                            <p><strong>Message:</strong> ${data.error || 'Unknown error'}</p>
+                            ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>💥 Request Failed</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                createBtn.disabled = false;
+            }
+        }
+
+        async function fetchTranscript() {
+            const sessionId = document.getElementById('sessionSelect').value;
+            const resultDiv = document.getElementById('result');
+            const fetchBtn = document.getElementById('fetchBtn');
+            
+            if (!sessionId) {
+                resultDiv.innerHTML = '<div class="result error">Please select a session first!</div>';
+                return;
+            }
+
+            fetchBtn.disabled = true;
+            resultDiv.innerHTML = '<div class="result loading">⏳ Fetching transcript from Heidi API...</div>';
+
+            try {
+                const response = await fetch('/api/heidi/transcript', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ sessionId }),
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.data) {
+                    resultDiv.innerHTML = `
+                        <div class="result">
+                            <h3>✅ Transcript Retrieved!</h3>
+                            <div class="transcript">${data.data.transcript}</div>
+                            <div class="meta">
+                                <strong>Session ID:</strong> ${data.data.visitId}<br>
+                                ${data.data.patientName ? `<strong>Patient:</strong> ${data.data.patientName}<br>` : ''}
+                                ${data.data.visitDate ? `<strong>Date:</strong> ${data.data.visitDate}<br>` : ''}
+                                ${data.data.duration ? `<strong>Duration:</strong> ${data.data.duration}s<br>` : ''}
+                                <strong>Fetched:</strong> ${new Date(data.fetchedAt).toLocaleString()}<br>
+                                <strong>Endpoint:</strong> ${data.endpoint || 'N/A'}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <h3>❌ Error</h3>
+                            <p><strong>Message:</strong> ${data.error || 'Unknown error'}</p>
+                            ${data.attemptedUrls ? `<p><strong>Tried endpoints:</strong><br>${data.attemptedUrls.join('<br>')}</p>` : ''}
+                            ${data.lastError ? `<p><strong>Last Error:</strong> ${data.lastError}</p>` : ''}
+                            ${data.suggestion ? `<p><strong>Suggestion:</strong> ${data.suggestion}</p>` : ''}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>💥 Request Failed</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                fetchBtn.disabled = false;
+            }
+        }
+
+        // Allow Enter key to trigger fetch
+        document.getElementById('sessionSelect').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') fetchTranscript();
+        });
+    </script>
+</body>
+</html>

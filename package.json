@@ -1,0 +1,26 @@
+{
+  "name": "heidihackss",
+  "version": "1.0.0",
+  "description": "testing",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "supabase-mcp": "node supabase-mcp.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chanu1406/HeidiHackss.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/chanu1406/HeidiHackss/issues"
+  },
+  "homepage": "https://github.com/chanu1406/HeidiHackss#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.22.0",
+    "@supabase/supabase-js": "^2.84.0"
+  }
+}
