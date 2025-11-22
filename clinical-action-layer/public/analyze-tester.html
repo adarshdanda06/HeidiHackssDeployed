@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Analyze Endpoint Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+        
+        .content {
+            padding: 2rem;
+        }
+        
+        .section {
+            margin-bottom: 2rem;
+        }
+        
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.9rem;
+            resize: vertical;
+            transition: border-color 0.2s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        button {
+            flex: 1;
+            padding: 0.875rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #f7fafc;
+            color: #4a5568;
+            border: 2px solid #e2e8f0;
+        }
+        
+        .btn-secondary:hover {
+            background: #edf2f7;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .results {
+            background: #f7fafc;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 1rem;
+            border: 2px solid #e2e8f0;
+        }
+        
+        .results.success {
+            border-color: #48bb78;
+            background: #f0fff4;
+        }
+        
+        .results.error {
+            border-color: #f56565;
+            background: #fff5f5;
+        }
+        
+        .action-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .action-card h3 {
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+        
+        .action-type {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+        
+        .type-medication { background: #bee3f8; color: #2c5282; }
+        .type-lab { background: #fbd38d; color: #7c2d12; }
+        .type-imaging { background: #c6f6d5; color: #22543d; }
+        .type-referral { background: #fed7d7; color: #742a2a; }
+        .type-followup { background: #e9d8fd; color: #44337a; }
+        
+        .json-viewer {
+            background: #1a202c;
+            color: #68d391;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            margin-top: 1rem;
+        }
+        
+        .status {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+        
+        .status.loading {
+            background: #bee3f8;
+            color: #2c5282;
+        }
+        
+        .status.success {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+        
+        .status.error {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+        
+        .example-transcripts {
+            display: grid;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .example-btn {
+            padding: 0.75rem;
+            background: #edf2f7;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .example-btn:hover {
+            background: #e2e8f0;
+            border-color: #667eea;
+        }
+        
+        .example-btn strong {
+            color: #667eea;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Claude Analysis Tester</h1>
+            <p>Test the /api/analyze endpoint with clinical transcripts</p>
+        </div>
+        
+        <div class="content">
+            <div class="section">
+                <h2>📝 Sample Transcripts</h2>
+                <div class="example-transcripts">
+                    <button class="example-btn" onclick="loadExample(1)">
+                        <strong>Example 1: Respiratory Infection</strong>
+                        Patient with cough, fever. Prescribe antibiotics and order chest X-ray.
+                    </button>
+                    <button class="example-btn" onclick="loadExample(2)">
+                        <strong>Example 2: Diabetes Follow-up</strong>
+                        Check A1C, adjust metformin, refer to endocrinology.
+                    </button>
+                    <button class="example-btn" onclick="loadExample(3)">
+                        <strong>Example 3: Hypertension Management</strong>
+                        High blood pressure, start lisinopril, order lipid panel.
+                    </button>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>💬 Clinical Transcript</h2>
+                <textarea id="transcript" placeholder="Paste or type a clinical consultation transcript here..."></textarea>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="analyzeTranscript()" id="analyzeBtn">
+                        🔍 Analyze with Claude
+                    </button>
+                    <button class="btn-secondary" onclick="clearForm()">
+                        🗑️ Clear
+                    </button>
+                </div>
+            </div>
+            
+            <div id="status"></div>
+            
+            <div id="results" style="display: none;">
+                <div class="section">
+                    <h2>✅ Extracted Actions</h2>
+                    <div id="actionsDisplay"></div>
+                </div>
+                
+                <div class="section">
+                    <h2>📄 Raw JSON Response</h2>
+                    <div class="json-viewer" id="jsonDisplay"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const examples = {
+            1: `Chief Complaint: Patient presents with productive cough and fever for 3 days.
+
+History: 45-year-old male with history of asthma. Reports fever up to 101.5°F, yellow-green sputum, shortness of breath with exertion. Denies chest pain.
+
+Physical Exam: Temp 100.8°F, BP 128/82, HR 92, RR 18. Bilateral crackles heard in lower lung fields. Decreased air entry on right side.
+
+Assessment: Likely community-acquired pneumonia, possible bacterial superinfection.
+
+Plan:
+- Start Amoxicillin-Clavulanate 875mg twice daily for 10 days
+- Order chest X-ray to rule out infiltrates
+- Order CBC and CMP
+- Continue albuterol inhaler as needed
+- Follow up in 1 week or sooner if symptoms worsen`,
+
+            2: `Follow-up Visit: Type 2 Diabetes Mellitus
+
+Patient is a 58-year-old female with Type 2 DM on metformin 1000mg BID. Reports good compliance but occasional fatigue and increased thirst.
+
+Vitals: BP 142/88, BMI 32
+Labs from last visit (3 months ago): A1C 8.2%, fasting glucose 165
+
+Assessment: Suboptimal glycemic control despite metformin.
+
+Plan:
+- Increase metformin to 1500mg in morning, 1000mg in evening
+- Order HbA1c, comprehensive metabolic panel, lipid panel
+- Refer to endocrinology for consideration of additional agents
+- Nutrition referral for diabetes education
+- Follow up in 3 months with labs`,
+
+            3: `Annual Physical: 62-year-old male
+
+Patient presents for routine annual exam. No acute complaints. History of hypertension, not currently on medications (stopped 6 months ago due to side effects).
+
+Vitals: BP 156/94 (confirmed on repeat), HR 78, BMI 28
+Review of systems: Denies chest pain, shortness of breath, headaches
+
+Assessment: Uncontrolled hypertension, dyslipidemia (per previous labs)
+
+Plan:
+- Start Lisinopril 10mg daily
+- Order lipid panel, basic metabolic panel, urinalysis
+- Schedule follow-up BP check in 2 weeks
+- Discussed lifestyle modifications: low sodium diet, regular exercise
+- Patient agrees to home BP monitoring`
+        };
+
+        function loadExample(num) {
+            document.getElementById('transcript').value = examples[num];
+        }
+
+        function clearForm() {
+            document.getElementById('transcript').value = '';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('status').innerHTML = '';
+        }
+
+        async function analyzeTranscript() {
+            const transcript = document.getElementById('transcript').value.trim();
+            const btn = document.getElementById('analyzeBtn');
+            const statusDiv = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            
+            if (!transcript) {
+                statusDiv.innerHTML = '<div class="status error">⚠️ Please enter a transcript first</div>';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Analyzing...';
+            statusDiv.innerHTML = '<div class="status loading">🤖 Sending transcript to Claude for analysis...</div>';
+            resultsDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ transcript })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to analyze transcript');
+                }
+
+                // Display results
+                displayResults(data);
+                statusDiv.innerHTML = `<div class="status success">✅ Successfully extracted ${data.actions?.length || 0} clinical actions!</div>`;
+
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.innerHTML = `<div class="status error">❌ Error: ${error.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔍 Analyze with Claude';
+            }
+        }
+
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('results');
+            const actionsDiv = document.getElementById('actionsDisplay');
+            const jsonDiv = document.getElementById('jsonDisplay');
+
+            // Display actions as cards
+            if (data.actions && data.actions.length > 0) {
+                actionsDiv.innerHTML = data.actions.map((action, idx) => `
+                    <div class="action-card">
+                        <div class="action-type type-${action.type}">${action.type}</div>
+                        <h3>Action ${idx + 1}: ${action.resource.resourceType || 'Unknown'}</h3>
+                        <p style="color: #4a5568; margin: 0.5rem 0;">${action.description}</p>
+                        <details style="margin-top: 0.75rem;">
+                            <summary style="cursor: pointer; color: #667eea; font-weight: 600;">View FHIR Resource</summary>
+                            <pre style="background: #f7fafc; padding: 0.75rem; border-radius: 4px; margin-top: 0.5rem; overflow-x: auto; font-size: 0.8rem;">${JSON.stringify(action.resource, null, 2)}</pre>
+                        </details>
+                    </div>
+                `).join('');
+            } else {
+                actionsDiv.innerHTML = '<p style="color: #718096;">No actions extracted from the transcript.</p>';
+            }
+
+            // Display raw JSON
+            jsonDiv.textContent = JSON.stringify(data, null, 2);
+
+            resultsDiv.style.display = 'block';
+        }
+
+        // Allow Enter key to submit (with Shift+Enter for new line)
+        document.getElementById('transcript').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                analyzeTranscript();
+            }
+        });
+    </script>
+</body>
+</html>
