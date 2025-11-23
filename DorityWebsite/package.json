@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.70.1",
     "@medplum/core": "^5.0.4",
     "@medplum/fhirtypes": "^5.0.4",
+    "@sendgrid/mail": "^8.1.6",
     "lucide-react": "^0.454.0",
     "next": "15.0.3",
     "react": "^18.3.1",

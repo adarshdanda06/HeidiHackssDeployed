@@ -1,4 +1,4 @@
-export type ActionType = 'medication' | 'lab' | 'imaging' | 'referral' | 'followup';
+export type ActionType = 'medication' | 'lab' | 'imaging' | 'referral' | 'followup' | 'aftercare' | 'scheduling';
 
 export type ActionStatus = 'pending' | 'approved' | 'rejected';
 
@@ -8,7 +8,7 @@ export interface ClinicalAction {
   title: string;
   description: string;
   status: ActionStatus;
-  data: MedicationActionData | LabActionData | ImagingActionData | ReferralActionData | FollowUpActionData;
+  data: MedicationActionData | LabActionData | ImagingActionData | ReferralActionData | FollowUpActionData | SchedulingActionData;
   warnings?: string[];
   errors?: string[];
 }
@@ -48,6 +48,12 @@ export interface FollowUpActionData {
   timeframe: string;
   reason: string;
   appointmentType: string;
+}
+
+export interface SchedulingActionData {
+  reason: string;
+  when: string;
+  email: string;
 }
 
 // Heidi API Types

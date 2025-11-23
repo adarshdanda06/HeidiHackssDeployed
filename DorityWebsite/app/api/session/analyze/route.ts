@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,6 +10,62 @@ export async function POST(request: NextRequest) {
 
     const suggestedActions = [];
     const transcriptLower = transcript.toLowerCase();
+
+    // Anthropic Analysis for Scheduling
+    if (process.env.ANTHROPIC_API_KEY) {
+      try {
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const msg = await anthropic.messages.create({
+          model: "claude-3-5-sonnet-20241022",
+          max_tokens: 1024,
+          messages: [
+            { 
+              role: "user", 
+              content: `Analyze this medical transcript and determine if a follow-up meeting, appointment, or consultation needs to be scheduled. 
+              If yes, extract the specific reason ("why") and the suggested time/date ("when").
+              
+              Return ONLY a valid JSON object with the following keys:
+              - "needsMeeting": boolean
+              - "reason": string (concise explanation)
+              - "when": string (suggested timeframe)
+              
+              Do not include any markdown formatting or extra text, just the JSON object.
+              
+              Transcript:
+              ${transcript}` 
+            }
+          ]
+        });
+
+        const content = msg.content[0].type === 'text' ? msg.content[0].text : '';
+        console.log("Claude Analysis:", content);
+        
+        const analysis = JSON.parse(content.trim());
+
+        if (analysis.needsMeeting) {
+          suggestedActions.push({
+            id: `action-${Date.now()}-schedule`,
+            type: "scheduling",
+            status: "pending",
+            title: "Schedule Follow-up Meeting",
+            categoryLabel: "Scheduling",
+            details: `Schedule a meeting. Reason: ${analysis.reason}`,
+            when: analysis.when,
+            reason: analysis.reason,
+            safetyFlag: "medium",
+            rationale: analysis.reason,
+            fhirPreview: {
+              resourceType: "Appointment",
+              status: "proposed",
+              description: analysis.reason,
+              start: analysis.when 
+            },
+          });
+        }
+      } catch (err) {
+        console.error("Anthropic analysis failed:", err);
+      }
+    }
 
     // Medication suggestions
     if (transcriptLower.includes("metformin") || transcriptLower.includes("diabetes") || transcriptLower.includes("blood sugar")) {

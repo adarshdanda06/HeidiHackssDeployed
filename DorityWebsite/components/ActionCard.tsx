@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pill, Stethoscope, Image, FlaskConical, UserPlus, Calendar, FileText, AlertTriangle, CheckCircle2, Check, X, FileEdit, XCircle } from "lucide-react";
+import { Pill, Stethoscope, Image, FlaskConical, UserPlus, Calendar, FileText, AlertTriangle, CheckCircle2, Check, X, FileEdit, XCircle, Mail, Send } from "lucide-react";
 import { useSession, type SuggestedAction } from "@/contexts/SessionContext";
 import QuestionnaireForm from "./QuestionnaireForm";
 
@@ -11,6 +11,9 @@ interface ActionCardProps {
 
 // Calculate completion percentage based on available fields
 function calculateCompletionPercentage(action: SuggestedAction): number {
+  // If scheduling, always 100% if essential fields exist
+  if (action.type === 'scheduling') return 100;
+
   const fields = [
     action.title,
     action.details,
@@ -81,6 +84,7 @@ const TYPE_ICONS = {
   referral: UserPlus,
   followup: Calendar,
   aftercare: FileText,
+  scheduling: Mail,
 };
 
 const TYPE_COLORS = {
@@ -90,6 +94,7 @@ const TYPE_COLORS = {
   referral: "bg-orange-100 text-orange-600",
   followup: "bg-cyan-100 text-cyan-600",
   aftercare: "bg-pink-100 text-pink-600",
+  scheduling: "bg-indigo-100 text-indigo-600",
 };
 
 const SAFETY_COLORS = {
@@ -99,13 +104,35 @@ const SAFETY_COLORS = {
 };
 
 export default function ActionCard({ action }: ActionCardProps) {
-  const { updateActionStatus } = useSession();
+  const { updateActionStatus, updateAction } = useSession();
   const [showForm, setShowForm] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
   const [isEditingForm, setIsEditingForm] = useState(false);
-  const [formData, setFormData] = useState<any>(action.fhirPreview);
+  
+  // Initialize form data, including default email for scheduling
+  const [formData, setFormData] = useState<any>(() => {
+    if (action.type === 'scheduling') {
+      return {
+        ...action.fhirPreview,
+        email: action.email || 'adarsh.danda1@gmail.com',
+        subject: action.title ? `New Meeting Request: ${action.title}` : 'New Meeting Request',
+        body: `A new follow-up meeting has been suggested.\n\nReason: ${action.reason || action.rationale}\nSuggested Time: ${action.when || 'As soon as possible'}`
+      };
+    }
+    return action.fhirPreview;
+  });
 
   const handleApprove = () => {
+    // If scheduling, save the current formData (with edited email) before approving
+    if (action.type === 'scheduling') {
+      updateAction(action.id, {
+        email: formData.email,
+        title: formData.subject?.replace('New Meeting Request: ', '') || action.title,
+        // Add other fields if needed for the backend
+        // backend 'apply-actions' will use action.email, action.subject, action.body if present
+        ...formData
+      });
+    }
     updateActionStatus(action.id, "approved");
   };
 
@@ -114,8 +141,14 @@ export default function ActionCard({ action }: ActionCardProps) {
   };
 
   const handleSaveForm = () => {
-    // TODO: Update the action with the new form data
-    console.log('Saving form data:', formData);
+    updateAction(action.id, { 
+        fhirPreview: formData, // Keep fhirPreview updated
+        // For scheduling, we also update top-level props if changed
+        ...(action.type === 'scheduling' ? {
+            email: formData.email,
+            // potentially other fields
+        } : {})
+    });
     setIsEditingForm(false);
     setShowFormModal(false);
   };
@@ -184,7 +217,7 @@ export default function ActionCard({ action }: ActionCardProps) {
                 {isApproved && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200/50">
                     <Check className="w-3 h-3" />
-                    Approved
+                    {action.type === 'scheduling' ? 'Sent' : 'Approved'}
                   </span>
                 )}
               </div>
@@ -248,20 +281,43 @@ export default function ActionCard({ action }: ActionCardProps) {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 mt-4">
-            <button
-              onClick={() => setShowForm(!showForm)}
-              className="px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100/80 rounded-lg transition-all border border-zinc-200/70 flex items-center gap-1.5"
-            >
-              <FileEdit className="w-3.5 h-3.5" />
-              {showForm ? "Hide" : "View"} Form
-            </button>
-            <button
-              onClick={handleOpenFormModal}
-              className="px-3 py-1.5 text-xs font-medium text-[#7C2D3E] hover:text-white hover:bg-[#7C2D3E] rounded-lg transition-all border border-[#7C2D3E] flex items-center gap-1.5"
-            >
-              <FileEdit className="w-3.5 h-3.5" />
-              Edit Form
-            </button>
+            {/* Special View/Edit buttons for Scheduling */}
+            {action.type === 'scheduling' ? (
+                <>
+                    <button
+                    onClick={() => setShowForm(!showForm)}
+                    className="px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100/80 rounded-lg transition-all border border-zinc-200/70 flex items-center gap-1.5"
+                    >
+                    <Mail className="w-3.5 h-3.5" />
+                    {showForm ? "Hide" : "View"} Email
+                    </button>
+                    <button
+                    onClick={handleOpenFormModal}
+                    className="px-3 py-1.5 text-xs font-medium text-[#7C2D3E] hover:text-white hover:bg-[#7C2D3E] rounded-lg transition-all border border-[#7C2D3E] flex items-center gap-1.5"
+                    >
+                    <FileEdit className="w-3.5 h-3.5" />
+                    Edit Email
+                    </button>
+                </>
+            ) : (
+                <>
+                    <button
+                    onClick={() => setShowForm(!showForm)}
+                    className="px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100/80 rounded-lg transition-all border border-zinc-200/70 flex items-center gap-1.5"
+                    >
+                    <FileEdit className="w-3.5 h-3.5" />
+                    {showForm ? "Hide" : "View"} Form
+                    </button>
+                    <button
+                    onClick={handleOpenFormModal}
+                    className="px-3 py-1.5 text-xs font-medium text-[#7C2D3E] hover:text-white hover:bg-[#7C2D3E] rounded-lg transition-all border border-[#7C2D3E] flex items-center gap-1.5"
+                    >
+                    <FileEdit className="w-3.5 h-3.5" />
+                    Edit Form
+                    </button>
+                </>
+            )}
+            
             {!isApproved && (
               <>
                 <button
@@ -270,13 +326,24 @@ export default function ActionCard({ action }: ActionCardProps) {
                 >
                   Reject
                 </button>
-                <button
-                  onClick={handleApprove}
-                  className="px-4 py-1.5 text-xs font-semibold text-white bg-[#7C2D3E] hover:bg-[#5A1F2D] rounded-full shadow-sm transition-all flex items-center gap-1.5"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Approve & Sign
-                </button>
+                {/* Send button for Scheduling, Approve & Sign for others */}
+                {action.type === 'scheduling' ? (
+                    <button
+                        onClick={handleApprove}
+                        className="px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-full shadow-sm transition-all flex items-center gap-1.5"
+                    >
+                        <Send className="w-3.5 h-3.5" />
+                        Send
+                    </button>
+                ) : (
+                    <button
+                        onClick={handleApprove}
+                        className="px-4 py-1.5 text-xs font-semibold text-white bg-[#7C2D3E] hover:bg-[#5A1F2D] rounded-full shadow-sm transition-all flex items-center gap-1.5"
+                    >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Approve & Sign
+                    </button>
+                )}
               </>
             )}
           </div>
@@ -294,14 +361,32 @@ export default function ActionCard({ action }: ActionCardProps) {
               ) : (
                 <>
                   <h4 className="text-sm font-semibold text-zinc-900 mb-3 flex items-center gap-2">
-                    <FileText className="w-4 h-4" />
-                    {action.type === 'medication' && 'Medication Order Form'}
-                    {action.type === 'imaging' && 'Imaging Request Form'}
-                    {action.type === 'lab' && 'Laboratory Order Form'}
-                    {action.type === 'referral' && 'Referral Form'}
-                    {action.type === 'followup' && 'Follow-up Appointment Form'}
-                    {action.type === 'aftercare' && 'After-care Instructions Form'}
+                    {action.type === 'scheduling' ? (
+                        <>
+                            <Mail className="w-4 h-4" />
+                            Email Draft
+                        </>
+                    ) : (
+                        <>
+                            <FileText className="w-4 h-4" />
+                            {action.type === 'medication' && 'Medication Order Form'}
+                            {action.type === 'imaging' && 'Imaging Request Form'}
+                            {action.type === 'lab' && 'Laboratory Order Form'}
+                            {action.type === 'referral' && 'Referral Form'}
+                            {action.type === 'followup' && 'Follow-up Appointment Form'}
+                            {action.type === 'aftercare' && 'After-care Instructions Form'}
+                        </>
+                    )}
                   </h4>
+
+                  {/* Scheduling-specific fields */}
+                  {action.type === 'scheduling' && (
+                    <div className="space-y-3">
+                      <FormField label="To" value={formData.email || 'adarsh.danda1@gmail.com'} />
+                      <FormField label="Subject" value={formData.subject || `New Meeting Request: ${action.title}`} />
+                      <FormField label="Message" value={formData.body} isItalic fieldType="textarea" />
+                    </div>
+                  )}
 
                   {/* Medication-specific fields */}
                   {action.type === 'medication' && (
@@ -517,7 +602,9 @@ export default function ActionCard({ action }: ActionCardProps) {
             if (e.target === e.currentTarget) {
               setShowFormModal(false);
               setIsEditingForm(false);
-              setFormData(action.fhirPreview);
+              // Reset form data if cancelling? Or keep edits? 
+              // Usually cancel discards edits, but here we just close.
+              // Let's keep it simple and just close.
             }
           }}
         >
@@ -539,6 +626,7 @@ export default function ActionCard({ action }: ActionCardProps) {
                     {action.type === 'referral' && 'Edit Referral'}
                     {action.type === 'followup' && 'Edit Follow-up Appointment'}
                     {action.type === 'aftercare' && 'Edit After-care Instructions'}
+                    {action.type === 'scheduling' && 'Edit Email Draft'}
                   </h3>
                   <p className="text-xs text-zinc-600 mt-0.5">{action.title}</p>
                 </div>
@@ -547,7 +635,7 @@ export default function ActionCard({ action }: ActionCardProps) {
                 onClick={() => {
                   setShowFormModal(false);
                   setIsEditingForm(false);
-                  setFormData(action.fhirPreview);
+                  // setFormData(action.fhirPreview); // reset to original
                 }}
                 className="p-2 hover:bg-zinc-100 rounded-lg transition-colors"
               >
@@ -571,6 +659,31 @@ export default function ActionCard({ action }: ActionCardProps) {
                   />
                 ) : (
                   <>
+                    {/* Scheduling Form */}
+                    {action.type === 'scheduling' && (
+                        <div className="space-y-3">
+                            <FormField 
+                                label="To *" 
+                                value={formData.email} 
+                                isEditable={true}
+                                onChange={(val) => setFormData({...formData, email: val})}
+                            />
+                            <FormField 
+                                label="Subject *" 
+                                value={formData.subject} 
+                                isEditable={true}
+                                onChange={(val) => setFormData({...formData, subject: val})}
+                            />
+                            <FormField 
+                                label="Message *" 
+                                value={formData.body} 
+                                isEditable={true}
+                                fieldType="textarea"
+                                onChange={(val) => setFormData({...formData, body: val})}
+                            />
+                        </div>
+                    )}
+
                     {/* Medication Form */}
                     {action.type === 'medication' && (
                   <div className="space-y-3">
@@ -743,7 +856,7 @@ export default function ActionCard({ action }: ActionCardProps) {
                   onClick={() => {
                     setShowFormModal(false);
                     setIsEditingForm(false);
-                    setFormData(action.fhirPreview);
+                    // setFormData(action.fhirPreview);
                   }}
                   className="px-4 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-200 rounded-lg transition-all border border-zinc-300"
                 >
@@ -764,4 +877,3 @@ export default function ActionCard({ action }: ActionCardProps) {
     </>
   );
 }
-

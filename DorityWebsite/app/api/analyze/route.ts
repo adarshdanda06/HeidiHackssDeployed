@@ -13,11 +13,13 @@ interface AnalyzeRequest {
 }
 
 interface ClinicalActionResponse {
-  type: 'medication' | 'lab' | 'imaging' | 'referral' | 'followup';
+  type: 'medication' | 'lab' | 'imaging' | 'referral' | 'followup' | 'scheduling';
   description: string;
   questionnaireId?: string; // Optional: ID of the Medplum Questionnaire to use
   questionnaireName?: string; // Optional: Human-readable name of the questionnaire
   resource: MedicationRequest | ServiceRequest | any;
+  reason?: string;
+  when?: string;
 }
 
 interface AnalyzeResponse {
@@ -34,15 +36,25 @@ CRITICAL RULES:
 3. For each action, generate a Draft FHIR Resource:
    - MedicationRequest for medications/prescriptions
    - ServiceRequest for labs, imaging, referrals
+   - Appointment for follow-ups and scheduling
 4. Include a human-readable "description" for UI display
-5. Categorize each action with a "type": "medication", "lab", "imaging", "referral", or "followup"
+5. Categorize each action with a "type": "medication", "lab", "imaging", "referral", "followup", or "scheduling"
 6. **QUESTIONNAIRE MATCHING RULES - STRICT**:
    - When the user message includes AVAILABLE QUESTIONNAIRES, you MUST ONLY select from that exact list
    - NEVER create an action type unless a matching questionnaire exists in the provided list
    - If a clinical action doesn't have a matching questionnaire, DO NOT include that action
    - Match action type to questionnaire type: medication→medication, lab→lab, imaging→imaging, referral→referral, followup→followup
-   - Include "questionnaireId" and "questionnaireName" fields for EVERY action
-   - If no questionnaire matches the clinical intent, skip that action entirely
+   - Include "questionnaireId" and "questionnaireName" fields for EVERY action that has a matching questionnaire
+   - If no questionnaire matches the clinical intent, skip that action entirely UNLESS it's a scheduling action
+
+TYPE DEFINITIONS:
+- "medication": Prescriptions and drug orders
+- "lab": Laboratory tests
+- "imaging": Radiology/Imaging studies
+- "referral": Referrals to other specialists
+- "followup": Clinical follow-up appointments within the EMR (e.g. "See patient in 2 weeks")
+- "scheduling": Administrative meeting requests or external coordination that requires sending an email (e.g. "Schedule a meeting to discuss surgery options"). 
+   - For "scheduling" actions, YOU MUST INCLUDE "reason" and "when" fields in the action object.
 
 OUTPUT FORMAT (raw JSON only):
 {
@@ -108,6 +120,18 @@ OUTPUT FORMAT (raw JSON only):
         },
         "priority": "routine"
       }
+    },
+    {
+      "type": "scheduling",
+      "description": "Schedule a meeting to review surgical options",
+      "reason": "Patient requested detailed discussion about surgical risks and benefits",
+      "when": "Next Tuesday afternoon",
+      "resource": {
+        "resourceType": "Appointment",
+        "status": "proposed",
+        "description": "Meeting to review surgical options",
+        "start": "2023-11-28T14:00:00Z" 
+      }
     }
   ]
 }
@@ -126,6 +150,7 @@ Extract ONLY clinically actionable items:
 - Imaging studies
 - Specialist referrals
 - Follow-up appointments
+- Scheduling/Administrative meetings
 
 Do NOT extract:
 - General advice or counseling
@@ -243,7 +268,7 @@ export async function POST(request: NextRequest) {
         console.warn('[Analyze] Skipping invalid action:', action);
         return false;
       }
-      if (!['medication', 'lab', 'imaging', 'referral', 'followup'].includes(action.type)) {
+      if (!['medication', 'lab', 'imaging', 'referral', 'followup', 'scheduling'].includes(action.type)) {
         console.warn('[Analyze] Skipping action with invalid type:', action.type);
         return false;
       }

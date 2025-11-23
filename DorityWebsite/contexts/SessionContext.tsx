@@ -17,7 +17,7 @@ export interface PatientSummary {
 
 export interface SuggestedAction {
   id: string;
-  type: "medication" | "imaging" | "lab" | "referral" | "followup" | "aftercare";
+  type: "medication" | "imaging" | "lab" | "referral" | "followup" | "aftercare" | "scheduling";
   status: "pending" | "approved" | "rejected";
   title: string;
   categoryLabel: string;
@@ -29,6 +29,9 @@ export interface SuggestedAction {
   rationale: string;
   questionnaireId?: string; // Medplum Questionnaire ID
   questionnaireName?: string; // Human-readable questionnaire name
+  email?: string; // For scheduling actions
+  when?: string; // For scheduling actions
+  reason?: string; // For scheduling actions
   fhirPreview: {
     resourceType: string;
     status: string;
@@ -61,6 +64,7 @@ interface SessionContextType extends SessionState {
   startSession: (patientId: string) => Promise<void>;
   analyzeTranscript: () => Promise<void>;
   updateActionStatus: (actionId: string, status: "pending" | "approved" | "rejected") => void;
+  updateAction: (actionId: string, updates: Partial<SuggestedAction>) => void;
   applyApprovedActions: () => Promise<void>;
   generateAftercare: () => Promise<void>;
   sendAftercare: (email: string) => Promise<void>;
@@ -184,6 +188,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         questionnaireId: action.questionnaireId,
         questionnaireName: action.questionnaireName,
         fhirPreview: action.resource,
+        email: action.email,
+        when: action.when,
+        reason: action.reason,
       }));
 
       setState((prev) => ({
@@ -206,6 +213,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setState((prev) => {
         const updatedActions = prev.suggestedActions.map((action) =>
           action.id === actionId ? { ...action, status } : action
+        );
+
+        const approvedActions = updatedActions.filter((a) => a.status === "approved");
+
+        return {
+          ...prev,
+          suggestedActions: updatedActions,
+          approvedActions,
+        };
+      });
+    },
+    []
+  );
+
+  const updateAction = useCallback(
+    (actionId: string, updates: Partial<SuggestedAction>) => {
+      setState((prev) => {
+        const updatedActions = prev.suggestedActions.map((action) =>
+          action.id === actionId ? { ...action, ...updates } : action
         );
 
         const approvedActions = updatedActions.filter((a) => a.status === "approved");
@@ -386,6 +412,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     startSession,
     analyzeTranscript,
     updateActionStatus,
+    updateAction, // Ensure this is exported in the value object
     applyApprovedActions,
     generateAftercare,
     sendAftercare,
