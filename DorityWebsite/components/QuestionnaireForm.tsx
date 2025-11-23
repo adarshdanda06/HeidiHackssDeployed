@@ -3,12 +3,15 @@
 import { useState, useEffect } from "react";
 import { Questionnaire, QuestionnaireItem } from "@medplum/fhirtypes";
 import { Loader2 } from "lucide-react";
+import { mapFHIRToQuestionnaireResponses } from "@/lib/questionnaireMapper";
 
 interface QuestionnaireFormProps {
   questionnaireId: string;
   isEditable: boolean;
   onResponseChange?: (responses: Record<string, any>) => void;
   initialResponses?: Record<string, any>;
+  fhirResource?: any; // FHIR resource to extract values from for autofilling
+  patientData?: any; // Patient demographic data for autofilling patient fields
 }
 
 interface QuestionnaireItemRendererProps {
@@ -28,6 +31,14 @@ function QuestionnaireItemRenderer({
 }: QuestionnaireItemRendererProps) {
   const isRequired = item.required === true;
   const linkId = item.linkId || '';
+  
+  // Get the actual value for this item from the flat responses object
+  const itemValue = value?.[linkId];
+  
+  // Debug log for nested items
+  if (depth > 0 && itemValue !== undefined) {
+    console.log(`[QuestionnaireItemRenderer] Rendering nested item ${linkId} with value:`, itemValue);
+  }
 
   // Render based on item type
   const renderInput = () => {
@@ -37,7 +48,7 @@ function QuestionnaireItemRenderer({
         if (item.type === 'text') {
           return (
             <textarea
-              value={value || ''}
+              value={itemValue || ''}
               onChange={(e) => onChange(linkId, e.target.value)}
               disabled={!isEditable}
               className="w-full text-xs text-zinc-600 border border-zinc-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#7C2D3E]/20 focus:border-[#7C2D3E]/30 resize-none disabled:bg-zinc-50 disabled:text-zinc-500"
@@ -49,7 +60,7 @@ function QuestionnaireItemRenderer({
         return (
           <input
             type="text"
-            value={value || ''}
+            value={itemValue || ''}
             onChange={(e) => onChange(linkId, e.target.value)}
             disabled={!isEditable}
             className="w-full text-xs text-zinc-600 border border-zinc-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#7C2D3E]/20 focus:border-[#7C2D3E]/30 disabled:bg-zinc-50 disabled:text-zinc-500"
@@ -64,7 +75,7 @@ function QuestionnaireItemRenderer({
               <input
                 type="radio"
                 name={linkId}
-                checked={value === true}
+                checked={itemValue === true}
                 onChange={() => onChange(linkId, true)}
                 disabled={!isEditable}
                 className="text-[#7C2D3E] focus:ring-[#7C2D3E]/20"
@@ -75,7 +86,7 @@ function QuestionnaireItemRenderer({
               <input
                 type="radio"
                 name={linkId}
-                checked={value === false}
+                checked={itemValue === false}
                 onChange={() => onChange(linkId, false)}
                 disabled={!isEditable}
                 className="text-[#7C2D3E] focus:ring-[#7C2D3E]/20"
@@ -88,7 +99,7 @@ function QuestionnaireItemRenderer({
       case 'choice':
         return (
           <select
-            value={value || ''}
+            value={itemValue || ''}
             onChange={(e) => onChange(linkId, e.target.value)}
             disabled={!isEditable}
             className="w-full text-xs text-zinc-600 border border-zinc-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#7C2D3E]/20 focus:border-[#7C2D3E]/30 disabled:bg-zinc-50 disabled:text-zinc-500"
@@ -109,7 +120,7 @@ function QuestionnaireItemRenderer({
         return (
           <input
             type="date"
-            value={value || ''}
+            value={itemValue || ''}
             onChange={(e) => onChange(linkId, e.target.value)}
             disabled={!isEditable}
             className="w-full text-xs text-zinc-600 border border-zinc-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#7C2D3E]/20 focus:border-[#7C2D3E]/30 disabled:bg-zinc-50 disabled:text-zinc-500"
@@ -122,7 +133,7 @@ function QuestionnaireItemRenderer({
           <input
             type="number"
             step={item.type === 'decimal' ? '0.01' : '1'}
-            value={value || ''}
+            value={itemValue || ''}
             onChange={(e) => onChange(linkId, item.type === 'decimal' ? parseFloat(e.target.value) : parseInt(e.target.value))}
             disabled={!isEditable}
             className="w-full text-xs text-zinc-600 border border-zinc-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#7C2D3E]/20 focus:border-[#7C2D3E]/30 disabled:bg-zinc-50 disabled:text-zinc-500"
@@ -143,7 +154,7 @@ function QuestionnaireItemRenderer({
         return (
           <input
             type="text"
-            value={value || ''}
+            value={itemValue || ''}
             onChange={(e) => onChange(linkId, e.target.value)}
             disabled={!isEditable}
             className="w-full text-xs text-zinc-600 border border-zinc-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#7C2D3E]/20 focus:border-[#7C2D3E]/30 disabled:bg-zinc-50 disabled:text-zinc-500"
@@ -165,7 +176,7 @@ function QuestionnaireItemRenderer({
             key={idx}
             item={subItem}
             isEditable={isEditable}
-            value={value?.[subItem.linkId || idx]}
+            value={value}
             onChange={onChange}
             depth={depth + 1}
           />
@@ -199,7 +210,9 @@ export default function QuestionnaireForm({
   questionnaireId,
   isEditable,
   onResponseChange,
-  initialResponses = {}
+  initialResponses = {},
+  fhirResource,
+  patientData
 }: QuestionnaireFormProps) {
   const [questionnaire, setQuestionnaire] = useState<Questionnaire | null>(null);
   const [responses, setResponses] = useState<Record<string, any>>(initialResponses);
@@ -212,6 +225,9 @@ export default function QuestionnaireForm({
         setLoading(true);
         setError(null);
         
+        console.log('[QuestionnaireForm] Fetching questionnaire:', questionnaireId);
+        console.log('[QuestionnaireForm] FHIR resource:', fhirResource);
+        
         const response = await fetch(`/api/questionnaire/${questionnaireId}`);
         
         if (!response.ok) {
@@ -219,7 +235,86 @@ export default function QuestionnaireForm({
         }
 
         const data = await response.json();
+        console.log('[QuestionnaireForm] Questionnaire data:', data.questionnaire);
         setQuestionnaire(data.questionnaire);
+        
+        // If fhirResource is a QuestionnaireResponse, extract answers directly
+        if (fhirResource && fhirResource.resourceType === 'QuestionnaireResponse') {
+          console.log('[QuestionnaireForm] ===== EXTRACTION START =====');
+          console.log('[QuestionnaireForm] Full fhirResource:', JSON.stringify(fhirResource, null, 2));
+          const extractedResponses: Record<string, any> = {};
+          
+          // Recursive function to extract answers from nested items
+          const extractAnswers = (items: any[], depth = 0) => {
+            const indent = '  '.repeat(depth);
+            console.log(`${indent}[QuestionnaireForm] Extracting from ${items.length} items at depth ${depth}`);
+            
+            for (const item of items) {
+              console.log(`${indent}[QuestionnaireForm] Processing item:`, item.linkId, 'type:', item.type);
+              
+              // If this item has a direct answer, extract it
+              if (item.linkId && item.answer && item.answer.length > 0) {
+                const answer = item.answer[0];
+                console.log(`${indent}  -> Found answer:`, answer);
+                
+                // Extract the actual value from the answer
+                // CRITICAL: For valueCoding, use CODE not display (form expects code as value)
+                let value;
+                if (answer.valueCoding) {
+                  // For choice fields with valueCoding, use the CODE (what the select expects)
+                  value = answer.valueCoding.code || answer.valueCoding.display;
+                } else {
+                  value = answer.valueString || 
+                          answer.valueBoolean || 
+                          answer.valueInteger || 
+                          answer.valueDecimal ||
+                          answer.valueDate ||
+                          answer.valueReference?.display;
+                }
+                
+                if (value !== undefined && value !== null) {
+                  extractedResponses[item.linkId] = value;
+                  console.log(`${indent}  ✅ Extracted ${item.linkId}:`, value);
+                } else {
+                  console.log(`${indent}  ❌ No extractable value from answer:`, answer);
+                }
+              } else {
+                console.log(`${indent}  -> No answer array for ${item.linkId}`);
+              }
+              
+              // If this item has nested items (group), recursively extract from them
+              if (item.item && Array.isArray(item.item)) {
+                console.log(`${indent}  -> Recursing into ${item.item.length} nested items`);
+                extractAnswers(item.item, depth + 1);
+              }
+            }
+          };
+          
+          if (fhirResource.item && Array.isArray(fhirResource.item)) {
+            extractAnswers(fhirResource.item);
+          }
+          
+          console.log('[QuestionnaireForm] ===== EXTRACTION COMPLETE =====');
+          console.log('[QuestionnaireForm] Final extracted responses:', extractedResponses);
+          console.log('[QuestionnaireForm] Total fields extracted:', Object.keys(extractedResponses).length);
+          setResponses(extractedResponses);
+          onResponseChange?.(extractedResponses);
+        }
+        // Fallback: try to autofill from FHIR resource if provided
+        else if (fhirResource && data.questionnaire) {
+          console.log('[QuestionnaireForm] Starting fallback autofill...');
+          console.log('[QuestionnaireForm] Patient data:', patientData);
+          const autofilledResponses = mapFHIRToQuestionnaireResponses(
+            fhirResource,
+            data.questionnaire,
+            patientData
+          );
+          console.log('[QuestionnaireForm] Autofilled responses:', autofilledResponses);
+          setResponses(autofilledResponses);
+          onResponseChange?.(autofilledResponses);
+        } else {
+          console.log('[QuestionnaireForm] No autofill - fhirResource:', !!fhirResource, 'questionnaire:', !!data.questionnaire);
+        }
       } catch (err) {
         console.error('Error fetching questionnaire:', err);
         setError('Failed to load questionnaire form');
@@ -231,7 +326,7 @@ export default function QuestionnaireForm({
     if (questionnaireId) {
       fetchQuestionnaire();
     }
-  }, [questionnaireId]);
+  }, [questionnaireId, fhirResource]);
 
   const handleResponseChange = (linkId: string, value: any) => {
     const newResponses = { ...responses, [linkId]: value };
@@ -281,7 +376,7 @@ export default function QuestionnaireForm({
             key={idx}
             item={item}
             isEditable={isEditable}
-            value={responses[item.linkId || idx]}
+            value={responses}
             onChange={handleResponseChange}
           />
         ))}

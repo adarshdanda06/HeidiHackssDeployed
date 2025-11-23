@@ -23,6 +23,13 @@ export interface PatientSummary {
   address: string;
   generalPractitioner: string;
   organizationAddress: string;
+  // Additional fields for questionnaire autofill
+  gender?: string;
+  age?: number;
+  phone?: string;
+  email?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
 }
 
 export interface SuggestedAction {
@@ -55,7 +62,6 @@ interface SessionState {
   currentStep: 1 | 2 | 3 | 4;
   sessionId: string | null;
   patient: PatientSummary | null;
-  patientSelection: PatientSelection | null;
   historySummary: string;
   transcript: string;
   suggestedActions: SuggestedAction[];
@@ -90,7 +96,6 @@ const initialState: SessionState = {
   currentStep: 1,
   sessionId: null,
   patient: null,
-  patientSelection: null,
   historySummary: "",
   transcript: "",
   suggestedActions: [],
@@ -148,7 +153,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         ...prev,
         sessionId: data.sessionId,
         patient: data.patient,
-        patientSelection: patientSelection || null,
         historySummary: data.historySummary || "",
         currentStep: 2,
         isLoading: { ...prev.isLoading, startSession: false },
@@ -176,18 +180,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     try {
       // Call real Claude API endpoint
-      // Build richer patient context for the analyzer so scheduling emails can
-      // include practitioner, practitioner address, and insurance information.
-      const patientContext = state.patient
-        ? `Patient: ${state.patient.name}\nMRN: ${state.patient.mrn}\nDOB: ${state.patient.dob}\nGeneral Practitioner: ${state.patient.generalPractitioner}\nPractitioner Address: ${state.patient.organizationAddress}\nInsurance: ${state.patient.insurance}\nPatientId: ${state.patient.id}`
-        : undefined;
-
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           transcript: state.transcript,
-          patientContext,
+          patientContext: state.patient ? `Patient: ${state.patient.name}` : undefined,
+          patient: state.patient, // Include full patient data for autofill
         }),
       });
 
