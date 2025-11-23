@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Execute API Tester</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: white;
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 2.5rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      margin-bottom: 1.5rem;
+    }
+
+    h2 {
+      color: #667eea;
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+    }
+
+    h3 {
+      color: #555;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+      font-size: 1.1rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #555;
+      font-weight: 500;
+    }
+
+    input[type="text"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+      font-family: 'Courier New', monospace;
+    }
+
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-right: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button.secondary {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    .status {
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+      font-weight: 500;
+    }
+
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .status.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+
+    .json-output {
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1rem;
+      overflow-x: auto;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .examples {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .example-card {
+      background: #f8f9fa;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .example-card:hover {
+      border-color: #667eea;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+    }
+
+    .example-card h4 {
+      color: #667eea;
+      margin-bottom: 0.5rem;
+    }
+
+    .example-card p {
+      color: #666;
+      font-size: 0.9rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-right: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .badge.medication {
+      background: #e3f2fd;
+      color: #1976d2;
+    }
+
+    .badge.lab {
+      background: #fff3e0;
+      color: #e65100;
+    }
+
+    .badge.imaging {
+      background: #f3e5f5;
+      color: #6a1b9a;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 Execute API Tester</h1>
+    
+    <div class="card">
+      <h2>Test Samples</h2>
+      <div class="examples">
+        <div class="example-card" onclick="loadMedicationExample()">
+          <h4>Medication Order</h4>
+          <p>Amoxicillin 500mg prescription</p>
+          <span class="badge medication">MedicationRequest</span>
+        </div>
+        <div class="example-card" onclick="loadLabExample()">
+          <h4>Lab Test Order</h4>
+          <p>Complete Blood Count (CBC)</p>
+          <span class="badge lab">ServiceRequest</span>
+        </div>
+        <div class="example-card" onclick="loadImagingExample()">
+          <h4>Imaging Order</h4>
+          <p>Chest X-Ray</p>
+          <span class="badge imaging">ServiceRequest</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Execute Request</h2>
+      
+      <div class="form-group">
+        <label for="patientId">Patient ID (Medplum Patient Resource ID)</label>
+        <input 
+          type="text" 
+          id="patientId" 
+          placeholder="e.g., 123e4567-e89b-12d3-a456-426614174000"
+          value="">
+      </div>
+
+      <h3>Action Data (JSON)</h3>
+      <div class="form-group">
+        <textarea id="actionJson" placeholder='Paste action JSON from /api/analyze...'></textarea>
+      </div>
+
+      <button onclick="executeAction()">Execute to Medplum</button>
+      <button class="secondary" onclick="fetchPatients()">Fetch Real Patient IDs</button>
+      <button class="secondary" onclick="clearForm()">Clear Form</button>
+
+      <div id="status"></div>
+      <div id="output"></div>
+    </div>
+
+    <div class="card">
+      <h2>Available Patients</h2>
+      <div id="patientList"></div>
+    </div>
+  </div>
+
+  <script>
+    // Example data
+    const medicationExample = {
+      type: "medication",
+      description: "Prescribe Amoxicillin 500mg three times daily for 7 days",
+      resource: {
+        resourceType: "MedicationRequest",
+        status: "draft",
+        intent: "order",
+        medicationCodeableConcept: {
+          coding: [{
+            system: "http://www.nlm.nih.gov/research/umls/rxnorm",
+            code: "308182",
+            display: "Amoxicillin 500 MG"
+          }],
+          text: "Amoxicillin 500mg"
+        },
+        dosageInstruction: [{
+          text: "500mg three times daily for 7 days",
+          timing: {
+            repeat: {
+              frequency: 3,
+              period: 1,
+              periodUnit: "d"
+            }
+          },
+          doseAndRate: [{
+            doseQuantity: {
+              value: 500,
+              unit: "mg"
+            }
+          }]
+        }]
+      }
+    };
+
+    const labExample = {
+      type: "lab",
+      description: "Order Complete Blood Count (CBC)",
+      resource: {
+        resourceType: "ServiceRequest",
+        status: "draft",
+        intent: "order",
+        category: [{
+          coding: [{
+            system: "http://snomed.info/sct",
+            code: "108252007",
+            display: "Laboratory procedure"
+          }]
+        }],
+        code: {
+          coding: [{
+            system: "http://loinc.org",
+            code: "58410-2",
+            display: "Complete blood count (hemogram) panel"
+          }],
+          text: "CBC"
+        },
+        priority: "routine"
+      }
+    };
+
+    const imagingExample = {
+      type: "imaging",
+      description: "Order Chest X-Ray",
+      resource: {
+        resourceType: "ServiceRequest",
+        status: "draft",
+        intent: "order",
+        category: [{
+          coding: [{
+            system: "http://snomed.info/sct",
+            code: "363679005",
+            display: "Imaging"
+          }]
+        }],
+        code: {
+          coding: [{
+            system: "http://loinc.org",
+            code: "36643-5",
+            display: "Chest X-ray"
+          }],
+          text: "Chest X-Ray"
+        },
+        bodySite: [{
+          coding: [{
+            system: "http://snomed.info/sct",
+            code: "51185008",
+            display: "Thorax"
+          }]
+        }],
+        priority: "routine"
+      }
+    };
+
+    function loadMedicationExample() {
+      document.getElementById('actionJson').value = JSON.stringify(medicationExample, null, 2);
+      showStatus('Loaded medication example', 'info');
+    }
+
+    function loadLabExample() {
+      document.getElementById('actionJson').value = JSON.stringify(labExample, null, 2);
+      showStatus('Loaded lab test example', 'info');
+    }
+
+    function loadImagingExample() {
+      document.getElementById('actionJson').value = JSON.stringify(imagingExample, null, 2);
+      showStatus('Loaded imaging example', 'info');
+    }
+
+    function clearForm() {
+      document.getElementById('patientId').value = '';
+      document.getElementById('actionJson').value = '';
+      document.getElementById('status').innerHTML = '';
+      document.getElementById('output').innerHTML = '';
+    }
+
+    function showStatus(message, type = 'info') {
+      const statusDiv = document.getElementById('status');
+      statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+    }
+
+    async function fetchPatients() {
+      try {
+        showStatus('Fetching patients from Medplum...', 'info');
+        
+        const response = await fetch('/api/medplum/patients');
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch patients');
+        }
+
+        const patientListDiv = document.getElementById('patientList');
+        if (data.patients && data.patients.length > 0) {
+          let html = '<div class="json-output"><table style="width: 100%; border-collapse: collapse;">';
+          html += '<tr style="background: #f0f0f0;"><th style="padding: 0.5rem; text-align: left;">Patient ID</th><th style="padding: 0.5rem; text-align: left;">Name</th><th style="padding: 0.5rem; text-align: left;">Action</th></tr>';
+          
+          data.patients.forEach(patient => {
+            html += `<tr style="border-bottom: 1px solid #ddd;">
+              <td style="padding: 0.5rem; font-family: monospace;">${patient.patientId}</td>
+              <td style="padding: 0.5rem;">${patient.patientFirstName} ${patient.patientLastName}</td>
+              <td style="padding: 0.5rem;"><button onclick="selectPatient('${patient.patientId}', '${patient.patientFirstName} ${patient.patientLastName}')" style="padding: 0.5rem 1rem; margin: 0;">Select</button></td>
+            </tr>`;
+          });
+          
+          html += '</table></div>';
+          patientListDiv.innerHTML = html;
+          showStatus(`Found ${data.patients.length} patients`, 'success');
+        } else {
+          patientListDiv.innerHTML = '<div class="status info">No patients found</div>';
+        }
+      } catch (error) {
+        showStatus(`Error: ${error.message}`, 'error');
+        console.error('Fetch error:', error);
+      }
+    }
+
+    function selectPatient(patientId, patientName) {
+      document.getElementById('patientId').value = patientId;
+      showStatus(`Selected patient: ${patientName} (${patientId})`, 'success');
+    }
+
+    async function executeAction() {
+      const patientId = document.getElementById('patientId').value.trim();
+      const actionJson = document.getElementById('actionJson').value.trim();
+
+      if (!patientId) {
+        showStatus('Please enter a Patient ID', 'error');
+        return;
+      }
+
+      if (!actionJson) {
+        showStatus('Please enter action JSON', 'error');
+        return;
+      }
+
+      let action;
+      try {
+        action = JSON.parse(actionJson);
+      } catch (error) {
+        showStatus('Invalid JSON in action field', 'error');
+        return;
+      }
+
+      try {
+        showStatus('Executing action to Medplum...', 'info');
+
+        const response = await fetch('/api/execute', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action,
+            patientId
+          }),
+        });
+
+        const data = await response.json();
+
+        const outputDiv = document.getElementById('output');
+        outputDiv.innerHTML = `<div class="json-output"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+
+        if (response.ok) {
+          showStatus(`✅ Successfully created ${data.resourceType} with ID: ${data.resourceId}`, 'success');
+        } else {
+          showStatus(`❌ Error: ${data.error}`, 'error');
+        }
+      } catch (error) {
+        showStatus(`Request failed: ${error.message}`, 'error');
+        console.error('Execute error:', error);
+      }
+    }
+
+    // Auto-load patients on page load
+    window.addEventListener('load', () => {
+      fetchPatients();
+    });
+  </script>
+</body>
+</html>
