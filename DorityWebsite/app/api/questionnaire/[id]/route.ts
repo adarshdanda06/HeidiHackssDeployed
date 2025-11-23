@@ -8,10 +8,10 @@ import { getMedplumClient } from '@/lib/medplum-client';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const questionnaireId = params.id;
+    const { id: questionnaireId } = await params;
 
     if (!questionnaireId) {
       return NextResponse.json(

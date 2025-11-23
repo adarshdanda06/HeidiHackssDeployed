@@ -104,7 +104,7 @@ const SAFETY_COLORS = {
 };
 
 export default function ActionCard({ action }: ActionCardProps) {
-  const { updateActionStatus, updateAction } = useSession();
+  const { updateActionStatus, updateAction, patient } = useSession();
   const [showForm, setShowForm] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
   const [isEditingForm, setIsEditingForm] = useState(false);
@@ -353,11 +353,16 @@ export default function ActionCard({ action }: ActionCardProps) {
             <div className="mt-4 p-4 bg-zinc-50/50 border border-zinc-200/70 rounded-xl space-y-4">
               {/* If questionnaire exists, use dynamic form */}
               {action.questionnaireId ? (
-                <QuestionnaireForm 
-                  questionnaireId={action.questionnaireId}
-                  isEditable={false}
-                  initialResponses={{}}
-                />
+                <>
+                  {console.log('[ActionCard] Rendering QuestionnaireForm with fhirPreview:', action.fhirPreview)}
+                  <QuestionnaireForm 
+                    questionnaireId={action.questionnaireId}
+                    isEditable={false}
+                    initialResponses={{}}
+                    fhirResource={action.fhirPreview}
+                    patientData={patient}
+                  />
+                </>
               ) : (
                 <>
                   <h4 className="text-sm font-semibold text-zinc-900 mb-3 flex items-center gap-2">
@@ -652,6 +657,8 @@ export default function ActionCard({ action }: ActionCardProps) {
                     questionnaireId={action.questionnaireId}
                     isEditable={true}
                     initialResponses={{}}
+                    fhirResource={action.fhirPreview}
+                    patientData={patient}
                     onResponseChange={(responses) => {
                       console.log('Questionnaire responses:', responses);
                       // TODO: Save responses to action
