@@ -1,19 +1,33 @@
 /**
  * Smart dummy data generator for filling missing questionnaire fields
  * Uses context-aware realistic values based on field type and clinical context
+ * Prefers real patient data from Medplum when available
  */
 
 import { QuestionnaireItem } from '@medplum/fhirtypes';
 
 interface DummyDataContext {
+  // Real patient data from Medplum (preferred)
   patientName?: string;
   patientAge?: number;
+  patientDob?: string;
+  patientGender?: string;
+  patientMrn?: string;
+  patientPhone?: string;
+  patientEmail?: string;
+  patientAddress?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  preferredPharmacy?: string;
+  insurance?: string;
+  // Clinical context
   clinicalContext?: string; // e.g., "subarachnoid hemorrhage", "chest pain"
   urgency?: 'stat' | 'urgent' | 'routine';
 }
 
 /**
  * Generate smart dummy data for a questionnaire field based on its linkId, type, and context
+ * ALWAYS prefers real patient data from Medplum when available
  */
 export function generateSmartDummyValue(
   item: QuestionnaireItem,
@@ -22,12 +36,13 @@ export function generateSmartDummyValue(
   const linkId = item.linkId?.toLowerCase() || '';
   const type = item.type;
 
-  // Patient demographic fields
+  // Patient demographic fields - USE REAL MEDPLUM DATA
   if (linkId.includes('patient') && linkId.includes('name')) {
     return context.patientName || 'John Doe';
   }
   
   if (linkId.includes('dob') || linkId.includes('birth')) {
+    if (context.patientDob) return context.patientDob;
     const age = context.patientAge || 45;
     const year = new Date().getFullYear() - age;
     return `${year}-06-15`;
@@ -38,24 +53,36 @@ export function generateSmartDummyValue(
   }
   
   if (linkId.includes('gender') || linkId.includes('sex')) {
-    return 'Unknown';
+    return context.patientGender || 'Unknown';
   }
   
   if (linkId.includes('mrn') || linkId.includes('medical') && linkId.includes('record')) {
-    return `MRN${Math.random().toString().slice(2, 9)}`;
+    return context.patientMrn || `MRN${Math.random().toString().slice(2, 9)}`;
   }
 
-  // Contact information
+  // Contact information - USE REAL MEDPLUM DATA
   if (linkId.includes('phone') || linkId.includes('telephone')) {
-    return '555-0123';
+    if (linkId.includes('emergency')) {
+      return context.emergencyContactPhone || context.patientPhone || '555-0123';
+    }
+    return context.patientPhone || '555-0123';
   }
   
   if (linkId.includes('email')) {
-    return 'patient@example.com';
+    return context.patientEmail || 'patient@example.com';
   }
   
   if (linkId.includes('address')) {
-    return '123 Main Street, Anytown, ST 12345';
+    return context.patientAddress || '123 Main Street, Anytown, ST 12345';
+  }
+  
+  if (linkId.includes('emergency') && linkId.includes('contact')) {
+    if (linkId.includes('name')) {
+      return context.emergencyContactName || 'Emergency Contact';
+    }
+    if (linkId.includes('phone')) {
+      return context.emergencyContactPhone || '555-0124';
+    }
   }
 
   // Clinical fields - Imaging/Procedures
@@ -144,18 +171,41 @@ export function generateSmartDummyValue(
     return 'No refills';
   }
 
-  // Provider fields
+  // Provider fields - Generate realistic names
   if (linkId.includes('provider') || linkId.includes('physician') || 
       linkId.includes('prescriber') || linkId.includes('ordering')) {
-    return 'Ordering Physician';
+    // Generate realistic provider names
+    const providerNames = [
+      'Dr. Sarah Chen, MD',
+      'Dr. Michael Johnson, MD',
+      'Dr. Emily Rodriguez, MD',
+      'Dr. David Kim, MD',
+      'Dr. Jennifer Williams, MD',
+      'Dr. Robert Thompson, MD'
+    ];
+    return providerNames[Math.floor(Math.random() * providerNames.length)];
+  }
+  
+  if (linkId.includes('npi')) {
+    // Generate realistic NPI number (10 digits)
+    return `12345${Math.random().toString().slice(2, 7)}`;
+  }
+  
+  if (linkId.includes('dea')) {
+    // Generate realistic DEA number format (2 letters + 7 digits)
+    return `AB${Math.random().toString().slice(2, 9)}`;
+  }
+  
+  if (linkId.includes('signature') || linkId.includes('sign')) {
+    return 'Electronically signed';
   }
 
-  // Pharmacy fields
+  // Pharmacy fields - USE REAL MEDPLUM DATA
   if (linkId.includes('pharmacy')) {
     if (linkId.includes('preference') || linkId.includes('name')) {
-      return 'Hospital Pharmacy';
+      return context.preferredPharmacy || 'Hospital Pharmacy';
     }
-    return 'Patient preferred pharmacy';
+    return context.preferredPharmacy || 'Patient preferred pharmacy';
   }
 
   // Scheduling/Logistics
@@ -185,9 +235,9 @@ export function generateSmartDummyValue(
     return 'None';
   }
 
-  // Insurance/Billing
+  // Insurance/Billing - USE REAL MEDPLUM DATA
   if (linkId.includes('insurance')) {
-    return 'Patient insurance on file';
+    return context.insurance || 'Patient insurance on file';
   }
 
   // Generic fallbacks based on type
@@ -202,10 +252,32 @@ export function generateSmartDummyValue(
       return 0.0;
     
     case 'date':
+      // Use current date for order dates, realistic dates for appointments
+      if (linkId.includes('order') || linkId.includes('request')) {
+        return new Date().toISOString().split('T')[0];
+      }
+      if (linkId.includes('appointment') || linkId.includes('schedule')) {
+        // Future date (7 days from now)
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + 7);
+        return futureDate.toISOString().split('T')[0];
+      }
       return new Date().toISOString().split('T')[0];
     
     case 'dateTime':
+      if (linkId.includes('appointment') || linkId.includes('schedule')) {
+        // Future datetime (7 days from now at 2 PM)
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + 7);
+        futureDate.setHours(14, 0, 0, 0);
+        return futureDate.toISOString();
+      }
       return new Date().toISOString();
+    
+    case 'time':
+      // Realistic medical appointment times
+      const times = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];
+      return times[Math.floor(Math.random() * times.length)];
     
     case 'choice':
       // CRITICAL: Return the actual code/value that the form expects
@@ -232,9 +304,9 @@ export function generateSmartDummyValue(
     default:
       // Check if it's a required field to give it more attention
       if (item.required) {
-        return 'Information not available - to be completed';
+        return 'To be completed';
       }
-      return 'N/A';
+      return '';
   }
 }
 

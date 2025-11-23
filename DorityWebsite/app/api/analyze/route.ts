@@ -163,6 +163,28 @@ IMPORTANT FHIR GUIDELINES:
 - Include as much detail as possible from the transcript in the FHIR resource fields
 - If you cannot determine specific codes, use text-only descriptions
 
+**CRITICAL DATA FILLING RULES:**
+1. For patient demographic fields (name, DOB, phone, email, MRN, address, etc.):
+   - ALWAYS use the EXACT values provided in the PATIENT INFORMATION section
+   - NEVER use placeholders like "Unknown", "N/A", "[Patient Name]"
+   
+2. For clinical fields (exam type, medication, indication, body region, etc.):
+   - Extract specific values from the transcript
+   - Be as detailed and specific as possible
+   - Example: Instead of "chest pain", use "Evaluate for acute coronary syndrome - patient presents with substernal chest pressure radiating to left arm"
+   
+3. For fields not in transcript or patient data:
+   - Provider names: Use realistic names like "Dr. Sarah Chen, MD", "Dr. Michael Johnson, MD"
+   - NPI numbers: Use format "1234567890"
+   - DEA numbers: Use format "AB1234567"
+   - Dates: Use current date for orders (format: YYYY-MM-DD)
+   - Times: Use realistic medical times like "09:00", "14:00", "16:00"
+   - Priorities: Use "routine", "urgent", or "stat" based on clinical urgency
+   - Phone numbers: Use patient's actual phone or format "555-0123"
+   - Signatures: Use "Electronically signed"
+   
+4. NEVER leave fields blank or use placeholder text - every field must have a realistic, actionable value
+
 **EXAMPLE IMAGING ORDER WITH QUESTIONNAIRE:**
 {
   "type": "imaging",
@@ -349,17 +371,36 @@ For a group linkId "exam-details" containing "examType" and "bodyRegion", format
     
     // Add patient data for better autofill
     if (patient) {
-      userMessage += `\n\n**PATIENT INFORMATION (Use this to fill patient fields):**
+      userMessage += `\n\n**PATIENT INFORMATION FROM MEDPLUM (Use EXACT values below for patient demographic fields):**
 - Patient Name: ${patient.name || 'Unknown'}
 - Date of Birth: ${patient.dob || 'Unknown'}
 - Age: ${patient.age || 'Unknown'}
 - Gender: ${patient.gender || 'Unknown'}
 - MRN: ${patient.mrn || 'Unknown'}
 - Phone: ${patient.phone || 'Unknown'}
+- Mobile Phone: ${patient.phone || 'Unknown'}
+- Home Phone: ${patient.phone || 'Unknown'}
+- Work Phone: ${patient.phone || 'Unknown'}
 - Email: ${patient.email || 'Unknown'}
 - Address: ${patient.address || 'Unknown'}
+- Emergency Contact: ${patient.emergencyContactName || 'Unknown'}
+- Emergency Phone: ${patient.emergencyContactPhone || 'Unknown'}
+- Preferred Pharmacy: ${patient.preferredPharmacy || 'Unknown'}
+- Insurance: ${patient.insurance || 'Unknown'}
+- Primary Care Provider: ${patient.generalPractitioner || 'Unknown'}
 
-**CRITICAL: When generating QuestionnaireResponse items, USE THE EXACT VALUES ABOVE for patient demographic fields!**`;
+**CRITICAL INSTRUCTIONS FOR USING PATIENT DATA:**
+1. For ANY patient demographic field (name, DOB, phone, email, address, MRN, etc.), USE THE EXACT VALUES ABOVE
+2. For clinical fields not in the patient data (exam type, indication, medications, etc.), extract from the transcript
+3. For fields not mentioned in transcript OR patient data, generate REALISTIC clinical values:
+   - Phone numbers: Use format "555-0123" or the patient's actual phone
+   - Dates: Use realistic medical dates (e.g., current date for order date, future dates for appointments)
+   - Times: Use realistic times (e.g., "2:00 PM", "14:00")
+   - Providers: Use realistic provider names (e.g., "Dr. Smith", "Dr. Johnson") unless specified in transcript
+   - Clinical indicators: Be specific and realistic (e.g., "Evaluate for pneumonia - persistent cough and fever x3 days")
+   - Priorities: Use "Routine", "Urgent", or "STAT" based on clinical context
+   - Boolean fields: Use true/false appropriately (e.g., pregnancy: false for males, contrast: false unless specified)
+4. NEVER leave fields empty or use placeholders like "N/A", "Unknown", "[value]" - always provide realistic values`;
     } else if (patientContext) {
       userMessage += `\n\nPatient Context:\n${patientContext}`;
     }
@@ -457,13 +498,25 @@ For a group linkId "exam-details" containing "examType" and "bodyRegion", format
                          action.description.toLowerCase().includes('immediate') ? 'stat' :
                          action.description.toLowerCase().includes('urgent') ? 'urgent' : 'routine';
           
-          // Fill missing fields with smart dummy data
+          // Fill missing fields with smart dummy data using REAL patient data from Medplum
           const filledResource = fillMissingFields(
             action.resource,
             questionnaire,
             {
+              // Real patient data from Medplum
               patientName: patient?.name,
               patientAge: patient?.age,
+              patientDob: patient?.dob,
+              patientGender: patient?.gender,
+              patientMrn: patient?.mrn,
+              patientPhone: patient?.phone,
+              patientEmail: patient?.email,
+              patientAddress: patient?.address,
+              emergencyContactName: patient?.emergencyContactName,
+              emergencyContactPhone: patient?.emergencyContactPhone,
+              preferredPharmacy: patient?.preferredPharmacy,
+              insurance: patient?.insurance,
+              // Clinical context
               clinicalContext,
               urgency
             }
