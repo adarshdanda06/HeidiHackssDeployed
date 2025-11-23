@@ -13,8 +13,12 @@ interface AnalyzeRequest {
 }
 
 interface ClinicalActionResponse {
-  type: 'medication' | 'lab' | 'imaging' | 'referral' | 'followup';
+  type: 'medication' | 'lab' | 'imaging' | 'referral' | 'followup' | 'scheduling';
   description: string;
+  reason?: string;
+  when?: string;
+  subject?: string;
+  body?: string;
   resource: MedicationRequest | ServiceRequest | any;
 }
 
@@ -34,7 +38,13 @@ CRITICAL RULES:
    - ServiceRequest for labs, imaging, referrals
    - QuestionnaireResponse for mental health screenings (PHQ-4)
 4. Include a human-readable "description" for UI display
-Categorize each action with a "type": "medication", "lab", "imaging", "referral", "followup", or "questionnaire_response"
+Categorize each action with a "type": "medication", "lab", "imaging", "referral", "followup", "scheduling", or "questionnaire_response"
+
+For SCHEDULING actions:
+- MUST include: reason, when, subject, body
+- The body MUST include the practitioner's name and practitioner address (if available in patient context)
+- Format the email in a warm, professional tone
+- Summarize key discussion points and next steps from the consultation
 
 OUTPUT FORMAT (raw JSON only):
 {
@@ -238,14 +248,40 @@ export async function POST(request: NextRequest) {
 
     // Validate each action
     const validatedActions = parsedResponse.actions.filter((action) => {
-      if (!action.type || !action.description || !action.resource) {
-        console.warn('[Analyze] Skipping invalid action:', action);
-        return false;
-      }
-      if (!['medication', 'lab', 'imaging', 'referral', 'followup', 'questionnaire_response'].includes(action.type)) {
+      // Validate type
+      if (!action.type || !['medication', 'lab', 'imaging', 'referral', 'followup', 'scheduling', 'questionnaire_response'].includes(action.type)) {
         console.warn('[Analyze] Skipping action with invalid type:', action.type);
         return false;
       }
+
+      // Validate description
+      if (!action.description) {
+        console.warn('[Analyze] Skipping action without description:', action);
+        return false;
+      }
+
+      // Scheduling actions need: reason, when, subject, body (no resource needed)
+      if (action.type === 'scheduling') {
+        if (!action.reason || !action.when || !action.subject || !action.body) {
+          console.warn('[Analyze] Skipping invalid scheduling action - missing required fields:', action);
+          return false;
+        }
+        return true;
+      }
+
+      // Other action types need a resource (handle both 'resource' and 'fhirResource' field names)
+      const hasResource = action.resource || (action as any).fhirResource;
+      if (!hasResource) {
+        console.warn('[Analyze] Skipping action without resource:', action);
+        return false;
+      }
+
+      // Normalize fhirResource to resource for consistency
+      if ((action as any).fhirResource && !action.resource) {
+        action.resource = (action as any).fhirResource;
+        delete (action as any).fhirResource;
+      }
+
       return true;
     });
 
