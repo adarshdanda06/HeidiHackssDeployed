@@ -115,8 +115,8 @@ export default function ActionCard({ action }: ActionCardProps) {
       return {
         ...action.fhirPreview,
         email: action.email || 'adarsh.danda1@gmail.com',
-        subject: action.title ? `New Meeting Request: ${action.title}` : 'New Meeting Request',
-        body: `A new follow-up meeting has been suggested.\n\nReason: ${action.reason || action.rationale}\nSuggested Time: ${action.when || 'As soon as possible'}`
+        subject: action.subject || (action.title ? `Follow-up: ${action.title}` : 'Follow-up Meeting'),
+        body: action.body || `Hi,\n\nWe would like to schedule a follow-up meeting.\n\nReason: ${action.reason || action.rationale}\nSuggested Time: ${action.when || 'As soon as possible'}\n\nBest regards,\nClinical Team`
       };
     }
     return action.fhirPreview;
@@ -127,8 +127,8 @@ export default function ActionCard({ action }: ActionCardProps) {
     if (action.type === 'scheduling') {
       updateAction(action.id, {
         email: formData.email,
-        title: formData.subject?.replace('New Meeting Request: ', '') || action.title,
-        // Add other fields if needed for the backend
+        subject: formData.subject,
+        body: formData.body,
         // backend 'apply-actions' will use action.email, action.subject, action.body if present
         ...formData
       });
@@ -330,10 +330,10 @@ export default function ActionCard({ action }: ActionCardProps) {
                 {action.type === 'scheduling' ? (
                     <button
                         onClick={handleApprove}
-                        className="px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-full shadow-sm transition-all flex items-center gap-1.5"
+                        className="px-4 py-1.5 text-xs font-semibold text-white bg-[#7C2D3E] hover:bg-[#5A1F2D] rounded-full shadow-sm transition-all flex items-center gap-1.5"
                     >
-                        <Send className="w-3.5 h-3.5" />
-                        Send
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Approve
                     </button>
                 ) : (
                     <button
@@ -379,14 +379,14 @@ export default function ActionCard({ action }: ActionCardProps) {
                     )}
                   </h4>
 
-                  {/* Scheduling-specific fields */}
-                  {action.type === 'scheduling' && (
-                    <div className="space-y-3">
-                      <FormField label="To" value={formData.email || 'adarsh.danda1@gmail.com'} />
-                      <FormField label="Subject" value={formData.subject || `New Meeting Request: ${action.title}`} />
-                      <FormField label="Message" value={formData.body} isItalic fieldType="textarea" />
-                    </div>
-                  )}
+              {/* Scheduling-specific fields */}
+              {action.type === 'scheduling' && (
+                <div className="space-y-3">
+                  <FormField label="To" value={formData.email || 'adarsh.danda1@gmail.com'} />
+                  <FormField label="Subject" value={formData.subject || action.subject || `Follow-up: ${action.title}`} />
+                  <FormField label="Message" value={formData.body || action.body} isItalic fieldType="textarea" />
+                </div>
+              )}
 
                   {/* Medication-specific fields */}
                   {action.type === 'medication' && (

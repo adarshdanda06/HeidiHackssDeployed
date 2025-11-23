@@ -20,6 +20,8 @@ interface ClinicalActionResponse {
   resource: MedicationRequest | ServiceRequest | any;
   reason?: string;
   when?: string;
+  subject?: string;
+  body?: string;
 }
 
 interface AnalyzeResponse {
@@ -53,8 +55,12 @@ TYPE DEFINITIONS:
 - "imaging": Radiology/Imaging studies
 - "referral": Referrals to other specialists
 - "followup": Clinical follow-up appointments within the EMR (e.g. "See patient in 2 weeks")
-- "scheduling": Administrative meeting requests or external coordination that requires sending an email (e.g. "Schedule a meeting to discuss surgery options"). 
-   - For "scheduling" actions, YOU MUST INCLUDE "reason" and "when" fields in the action object.
+- "scheduling": Email communications to the patient regarding next steps, follow-ups, or summary of instructions.
+   - For "scheduling" actions, YOU MUST INCLUDE:
+     - "reason": Internal reason for the scheduling (brief).
+     - "when": Suggested time (brief).
+     - "subject": A user-friendly email subject line.
+     - "body": A warm, user-friendly email body that reads through the context in the transcript, summarizes after-meeting instructions, and includes follow-up meeting time if necessary. Do not include any other context or meta-text.
 
 OUTPUT FORMAT (raw JSON only):
 {
@@ -126,6 +132,8 @@ OUTPUT FORMAT (raw JSON only):
       "description": "Schedule a meeting to review surgical options",
       "reason": "Patient requested detailed discussion about surgical risks and benefits",
       "when": "Next Tuesday afternoon",
+      "subject": "Follow-up: Surgical Options Discussion",
+      "body": "Hi [Patient Name],\n\nIt was good to speak with you today. As discussed, we should schedule a time next Tuesday afternoon to go over the surgical options in more detail. Please let us know what time works best for you.\n\nBest regards,\nDr. Smith",
       "resource": {
         "resourceType": "Appointment",
         "status": "proposed",

@@ -85,6 +85,8 @@ export async function POST(request: NextRequest) {
     console.log(`[Execute] Action type: ${action.type}, Description: ${action.description}`);
 
     // Handle Email Sending for Scheduling Actions
+    // Disabled: Consolidating into single aftercare email
+    /*
     if (action.type === 'scheduling') {
       console.log('📧 Processing scheduling action email...');
       
@@ -121,6 +123,7 @@ export async function POST(request: NextRequest) {
         console.warn('⚠️ SENDGRID_API_KEY not found. Email skipped.');
       }
     }
+    */
 
     // Get authenticated Medplum client
     let medplum;
@@ -135,7 +138,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Clone the resource to avoid mutating the original
-    const resourceToCreate = { ...action.resource };
+    const resourceToCreate: any = { ...action.resource };
 
     // Attach patient reference to the resource
     if (resourceType === 'Appointment') {

@@ -23,11 +23,14 @@ export async function POST(request: NextRequest) {
               role: "user", 
               content: `Analyze this medical transcript and determine if a follow-up meeting, appointment, or consultation needs to be scheduled. 
               If yes, extract the specific reason ("why") and the suggested time/date ("when").
+              Also, draft a user-friendly email subject and body. The body should read through the context in the transcript, summarize after-meeting instructions, and include follow-up meeting time if necessary.
               
               Return ONLY a valid JSON object with the following keys:
               - "needsMeeting": boolean
               - "reason": string (concise explanation)
               - "when": string (suggested timeframe)
+              - "subject": string (user-friendly email subject)
+              - "body": string (user-friendly email body, strictly the message content without meta-text)
               
               Do not include any markdown formatting or extra text, just the JSON object.
               
@@ -52,6 +55,8 @@ export async function POST(request: NextRequest) {
             details: `Schedule a meeting. Reason: ${analysis.reason}`,
             when: analysis.when,
             reason: analysis.reason,
+            subject: analysis.subject,
+            body: analysis.body,
             safetyFlag: "medium",
             rationale: analysis.reason,
             fhirPreview: {

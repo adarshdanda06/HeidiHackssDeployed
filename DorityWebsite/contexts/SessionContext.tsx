@@ -32,6 +32,8 @@ export interface SuggestedAction {
   email?: string; // For scheduling actions
   when?: string; // For scheduling actions
   reason?: string; // For scheduling actions
+  subject?: string; // For scheduling actions
+  body?: string; // For scheduling actions
   fhirPreview: {
     resourceType: string;
     status: string;
@@ -191,6 +193,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         email: action.email,
         when: action.when,
         reason: action.reason,
+        subject: action.subject,
+        body: action.body,
       }));
 
       setState((prev) => ({
@@ -338,6 +342,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           sessionId: state.sessionId,
           approvedActions: state.approvedActions,
           historySummary: state.historySummary,
+          transcript: state.transcript,
         }),
       });
 
@@ -359,7 +364,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         isLoading: { ...prev.isLoading, aftercare: false },
       }));
     }
-  }, [state.sessionId, state.approvedActions, state.historySummary]);
+  }, [state.sessionId, state.approvedActions, state.historySummary, state.transcript]);
 
   const sendAftercare = useCallback(
     async (email: string) => {
