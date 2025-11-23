@@ -7,6 +7,7 @@ import { useSession } from "@/contexts/SessionContext";
 export default function AftercarePanel() {
   const {
     patient,
+    patientSelection,
     approvedActions,
     aftercareSummary,
     setAftercareSummary,

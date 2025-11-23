@@ -104,19 +104,52 @@ const SAFETY_COLORS = {
 };
 
 export default function ActionCard({ action }: ActionCardProps) {
-  const { updateActionStatus, updateAction } = useSession();
+  const { updateActionStatus, updateAction, patient } = useSession();
   const [showForm, setShowForm] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
   const [isEditingForm, setIsEditingForm] = useState(false);
   
+  // Helpers for building/augmenting scheduling email body
+  const buildDefaultEmailBody = (act: any) => {
+    const reason = act.reason || act.rationale || '';
+    const when = act.when || 'As soon as possible';
+    const insurance = patient?.insurance ?? 'Not provided';
+    const practitioner = patient?.generalPractitioner ?? 'Not provided';
+    const practitionerAddress = patient?.organizationAddress ?? 'Not provided';
+
+    return `Hi,\n\nWe would like to schedule a follow-up meeting.\n\nReason: ${reason}\nSuggested Time: ${when}\n\nInsurance: ${insurance}\nPractitioner: ${practitioner}\nPractitioner Address: ${practitionerAddress}\n\nBest regards,\nClinical Team`;
+  };
+
+  const augmentBody = (body: string | undefined, act: any) => {
+    const insurance = patient?.insurance ?? 'Not provided';
+    const practitioner = patient?.generalPractitioner ?? 'Not provided';
+    const practitionerAddress = patient?.organizationAddress ?? 'Not provided';
+
+    if (!body || body.trim() === '') return buildDefaultEmailBody(act);
+
+    const lower = body.toLowerCase();
+    let augmented = body;
+    if (!lower.includes('insurance:')) {
+      augmented += `\n\nInsurance: ${insurance}`;
+    }
+    if (!lower.includes('practitioner:')) {
+      augmented += `\nPractitioner: ${practitioner}`;
+    }
+    if (!lower.includes('practitioner address:') && !lower.includes('practice address:')) {
+      augmented += `\nPractitioner Address: ${practitionerAddress}`;
+    }
+
+    return augmented;
+  };
+
   // Initialize form data, including default email for scheduling
   const [formData, setFormData] = useState<any>(() => {
     if (action.type === 'scheduling') {
       return {
         ...action.fhirPreview,
         email: action.email || 'adarsh.danda1@gmail.com',
-        subject: action.subject || (action.title ? `Follow-up: ${action.title}` : 'Follow-up Meeting'),
-        body: action.body || `Hi,\n\nWe would like to schedule a follow-up meeting.\n\nReason: ${action.reason || action.rationale}\nSuggested Time: ${action.when || 'As soon as possible'}\n\nBest regards,\nClinical Team`
+        subject: action.subject || (action.title ? `Follow-up: ${action.title}` : 'Follow-up Email'),
+        body: action.body ? augmentBody(action.body, action) : buildDefaultEmailBody(action),
       };
     }
     return action.fhirPreview;
@@ -142,12 +175,13 @@ export default function ActionCard({ action }: ActionCardProps) {
 
   const handleSaveForm = () => {
     updateAction(action.id, { 
-        fhirPreview: formData, // Keep fhirPreview updated
-        // For scheduling, we also update top-level props if changed
-        ...(action.type === 'scheduling' ? {
-            email: formData.email,
-            // potentially other fields
-        } : {})
+      fhirPreview: formData, // Keep fhirPreview updated
+      // For scheduling, we also update top-level props if changed
+      ...(action.type === 'scheduling' ? {
+        email: formData.email,
+        subject: formData.subject,
+        body: formData.body,
+      } : {})
     });
     setIsEditingForm(false);
     setShowFormModal(false);

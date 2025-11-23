@@ -28,26 +28,15 @@ interface AnalyzeResponse {
   actions: ClinicalActionResponse[];
 }
 
-const SYSTEM_PROMPT = `You are an expert Clinical AI Assistant specializing in FHIR R4.
+const SYSTEM_PROMPT = `You are a clinical workflow assistant. Your job is to read a transcript and extract actionable items for the care team. You will output a JSON array of actions. Each action must have a type, reason, and when. For scheduling actions, include a subject and body for the email. The body should be a draft email that the care team can send to the provider or patient. If the patient context is provided, use it to inform the actions. For scheduling actions, you MUST include the practitioner's name and practitioner address in the email body if they are available in the patient context. If you are unsure, say so in the reason field. Do not hallucinate information. Do not include any patient identifiers in the output except for the patientId field.
 
-Your task is to analyze clinical consultation transcripts and extract actionable clinical intents that can be converted into FHIR R4 resources.
-
-CRITICAL RULES:
-1. Output strictly raw JSON. No markdown formatting, no code blocks, no explanations.
-2. Extract clinical actions into an array called "actions"
-3. For each action, generate a Draft FHIR Resource:
-   - MedicationRequest for medications/prescriptions
-   - ServiceRequest for labs, imaging, referrals
-   - Appointment for follow-ups and scheduling
-4. Include a human-readable "description" for UI display
-5. Categorize each action with a "type": "medication", "lab", "imaging", "referral", "followup", or "scheduling"
-6. **QUESTIONNAIRE MATCHING RULES - STRICT**:
-   - When the user message includes AVAILABLE QUESTIONNAIRES, you MUST ONLY select from that exact list
-   - NEVER create an action type unless a matching questionnaire exists in the provided list
-   - If a clinical action doesn't have a matching questionnaire, DO NOT include that action
-   - Match action type to questionnaire type: medication→medication, lab→lab, imaging→imaging, referral→referral, followup→followup
-   - Include "questionnaireId" and "questionnaireName" fields for EVERY action that has a matching questionnaire
-   - If no questionnaire matches the clinical intent, skip that action entirely UNLESS it's a scheduling action
+QUESTIONNAIRE MATCHING RULES - STRICT:
+- When the user message includes AVAILABLE QUESTIONNAIRES, you MUST ONLY select from that exact list
+- NEVER create an action type unless a matching questionnaire exists in the provided list
+- If a clinical action doesn't have a matching questionnaire, DO NOT include that action
+- Match action type to questionnaire type: medication→medication, lab→lab, imaging→imaging, referral→referral, followup→followup
+- Include "questionnaireId" and "questionnaireName" fields for EVERY action that has a matching questionnaire
+- If no questionnaire matches the clinical intent, skip that action entirely UNLESS it's a scheduling action
 
 TYPE DEFINITIONS:
 - "medication": Prescriptions and drug orders
@@ -56,93 +45,11 @@ TYPE DEFINITIONS:
 - "referral": Referrals to other specialists
 - "followup": Clinical follow-up appointments within the EMR (e.g. "See patient in 2 weeks")
 - "scheduling": Email communications to the patient regarding next steps, follow-ups, or summary of instructions.
-   - For "scheduling" actions, YOU MUST INCLUDE:
-     - "reason": Internal reason for the scheduling (brief).
-     - "when": Suggested time (brief).
-     - "subject": A user-friendly email subject line.
-     - "body": A warm, user-friendly email body that reads through the context in the transcript, summarizes after-meeting instructions, and includes follow-up meeting time if necessary. Do not include any other context or meta-text.
-
-OUTPUT FORMAT (raw JSON only):
-{
-  "actions": [
-    {
-      "type": "medication",
-      "description": "Prescribe Amoxicillin 500mg three times daily for 7 days",
-      "questionnaireId": "abc-123-def",
-      "questionnaireName": "MedicationPrescriptionOrderForm",
-      "resource": {
-        "resourceType": "MedicationRequest",
-        "status": "draft",
-        "intent": "order",
-        "medicationCodeableConcept": {
-          "coding": [{
-            "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
-            "code": "308182",
-            "display": "Amoxicillin 500 MG"
-          }],
-          "text": "Amoxicillin 500mg"
-        },
-        "dosageInstruction": [{
-          "text": "500mg three times daily for 7 days",
-          "timing": {
-            "repeat": {
-              "frequency": 3,
-              "period": 1,
-              "periodUnit": "d"
-            }
-          },
-          "doseAndRate": [{
-            "doseQuantity": {
-              "value": 500,
-              "unit": "mg"
-            }
-          }]
-        }]
-      }
-    },
-    {
-      "type": "lab",
-      "description": "Order Complete Blood Count (CBC)",
-      "questionnaireId": "xyz-789-ghi",
-      "questionnaireName": "BloodTestOrderForm",
-      "resource": {
-        "resourceType": "ServiceRequest",
-        "status": "draft",
-        "intent": "order",
-        "category": [{
-          "coding": [{
-            "system": "http://snomed.info/sct",
-            "code": "108252007",
-            "display": "Laboratory procedure"
-          }]
-        }],
-        "code": {
-          "coding": [{
-            "system": "http://loinc.org",
-            "code": "58410-2",
-            "display": "Complete blood count (hemogram) panel"
-          }],
-          "text": "CBC"
-        },
-        "priority": "routine"
-      }
-    },
-    {
-      "type": "scheduling",
-      "description": "Schedule a meeting to review surgical options",
-      "reason": "Patient requested detailed discussion about surgical risks and benefits",
-      "when": "Next Tuesday afternoon",
-      "subject": "Follow-up: Surgical Options Discussion",
-      "body": "Hi [Patient Name],\n\nIt was good to speak with you today. As discussed, we should schedule a time next Tuesday afternoon to go over the surgical options in more detail. Please let us know what time works best for you.\n\nBest regards,\nDr. Smith",
-      "resource": {
-        "resourceType": "Appointment",
-        "status": "proposed",
-        "description": "Meeting to review surgical options",
-        "start": "2023-11-28T14:00:00Z" 
-      }
-    }
-  ]
-}
+  - For "scheduling" actions, YOU MUST INCLUDE:
+    - "reason": Internal reason for the scheduling (brief).
+    - "when": Suggested time (brief).
+    - "subject": A user-friendly email subject line.
+    - "body": A warm, user-friendly email body that reads through the context in the transcript, summarizes after-meeting instructions, and includes follow-up meeting time if necessary. Do not include any other context or meta-text.
 
 IMPORTANT FHIR GUIDELINES:
 - MedicationRequest MUST have: resourceType, status ("draft"), intent ("order"), medicationCodeableConcept
@@ -164,7 +71,9 @@ Do NOT extract:
 - General advice or counseling
 - Lifestyle recommendations without specific follow-up
 - Past medical history
-- Physical exam findings (unless they require action)`;
+- Physical exam findings (unless they require action)
+
+OUTPUT FORMAT: Return raw JSON only with an "actions" array.`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -288,21 +197,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       actions: validatedActions,
     });
-
   } catch (error) {
     console.error('[Analyze] Error:', error);
-    
     if (error instanceof Anthropic.APIError) {
       return NextResponse.json(
-        { error: `Claude API error: ${error.message}` },
-        { status: error.status || 500 }
+        { error: `Claude API error: ${String((error as Error).message)}` },
+        { status: (error as any).status || 500 }
       );
     }
-
     return NextResponse.json(
       { 
-        error: error instanceof Error ? error.message : 'Failed to analyze transcript',
-        details: error instanceof Error ? error.stack : undefined
+        error: error instanceof Error ? (error as Error).message : 'Failed to analyze transcript',
+        details: error instanceof Error ? (error as Error).stack : undefined
       },
       { status: 500 }
     );

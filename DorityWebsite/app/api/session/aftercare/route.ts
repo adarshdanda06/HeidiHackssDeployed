@@ -109,7 +109,7 @@ ${reminderInstruction}`;
     const bodyWithReminder = `${generatedEmail.body}\n\n${reminderNote}`;
 
     const combinedSummary = `Subject: ${generatedEmail.subject}\n\n${bodyWithReminder}`;
-
+    console.log('Combined Summary:', combinedSummary);
     return NextResponse.json({
       aftercareSummary: combinedSummary,
     });
