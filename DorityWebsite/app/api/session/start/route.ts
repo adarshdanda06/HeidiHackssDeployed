@@ -87,12 +87,43 @@ export async function POST(request: NextRequest) {
 
     // Extract comprehensive patient data using utility
     const patientData = extractPatientData(patient);
-    
+
+    // Debug: Log patient structure to understand where insurance is stored
+    console.log('[Session Start] Patient resource keys:', Object.keys(patient));
+    if (patient.extension) {
+      console.log('[Session Start] Patient extensions:', patient.extension.map(ext => ({ url: ext.url, hasValue: !!ext.valueString })));
+    }
+    if (patient.meta?.tag) {
+      console.log('[Session Start] Patient meta tags:', patient.meta.tag.map(tag => ({ system: tag.system, code: tag.code, display: tag.display })));
+    }
+
     // Extract pharmacy and GP from selection or FHIR data
     const patientAddress = patientData.address?.full || patientSelection?.patientAddress || "Not provided";
     const preferredPharmacy = findPreferredPharmacy(patient) || patientSelection?.preferredPharmacy || "Not specified";
     const generalPractitioner = patientSelection?.generalPractitioner || patient.generalPractitioner?.[0]?.display || "Not specified";
     const organizationAddress = patientSelection?.organizationAddress || "";
+
+    // Extract insurance from patient extensions or meta
+    let insurance = "Not specified";
+    // Check for insurance in extensions
+    if (patient.extension) {
+      const insuranceExt = patient.extension.find(ext =>
+        ext.url?.includes('insurance') || ext.url?.includes('coverage')
+      );
+      if (insuranceExt && insuranceExt.valueString) {
+        insurance = insuranceExt.valueString;
+      }
+    }
+    // Check for insurance in patient.meta.tag (some systems store it here)
+    if (insurance === "Not specified" && patient.meta?.tag) {
+      const insuranceTag = patient.meta.tag.find(tag =>
+        tag.display?.toLowerCase().includes('insurance') ||
+        tag.display?.toLowerCase().includes('coverage')
+      );
+      if (insuranceTag?.display) {
+        insurance = insuranceTag.display;
+      }
+    }
     
     console.log('[Session Start] Extracted patient data:', {
       id: patientData.id,
@@ -100,7 +131,10 @@ export async function POST(request: NextRequest) {
       hasPhone: !!patientData.primaryPhone,
       hasEmail: !!patientData.email,
       hasAddress: !!patientData.address,
-      emergencyContacts: patientData.emergencyContacts.length
+      emergencyContacts: patientData.emergencyContacts.length,
+      insurance: insurance,
+      hasInsuranceExtension: !!patient.extension?.find(ext => ext.url?.includes('insurance')),
+      hasInsuranceTag: !!patient.meta?.tag?.find(tag => tag.display?.toLowerCase().includes('insurance'))
     });
 
     // Build patient summary for session context
@@ -116,7 +150,7 @@ export async function POST(request: NextRequest) {
       address: patientAddress,
       generalPractitioner,
       organizationAddress,
-      insurance: "Not specified",
+      insurance, // Use extracted insurance
       // Include additional fields for questionnaire autofill
       gender: patientData.gender,
       age: patientData.age,
