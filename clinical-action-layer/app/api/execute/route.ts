@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { MedicationRequest, ServiceRequest, QuestionnaireResponse, Resource } from '@medplum/fhirtypes';
+import { MedicationRequest, ServiceRequest, Resource } from '@medplum/fhirtypes';
 import { getMedplumClient } from '@/lib/medplum-client';
 
 /**
@@ -7,9 +7,9 @@ import { getMedplumClient } from '@/lib/medplum-client';
  */
 interface ExecuteRequest {
   action: {
-    type: 'medication' | 'lab' | 'imaging' | 'referral' | 'followup' | 'questionnaire_response';
+    type: 'medication' | 'lab' | 'imaging' | 'referral' | 'followup';
     description: string;
-    resource: MedicationRequest | ServiceRequest | QuestionnaireResponse;
+    resource: MedicationRequest | ServiceRequest;
   };
   patientId: string; // Medplum Patient resource ID
 }
@@ -65,12 +65,10 @@ export async function POST(request: NextRequest) {
 
     // Validate resource type
     const resourceType = action.resource.resourceType;
-    if (resourceType !== 'MedicationRequest' && 
-        resourceType !== 'ServiceRequest' && 
-        resourceType !== 'QuestionnaireResponse') {
+    if (resourceType !== 'MedicationRequest' && resourceType !== 'ServiceRequest') {
       return NextResponse.json(
         { 
-          error: `Invalid resource type: ${resourceType}. Expected MedicationRequest, ServiceRequest, or QuestionnaireResponse` 
+          error: `Invalid resource type: ${resourceType}. Expected MedicationRequest or ServiceRequest` 
         },
         { status: 400 }
       );
@@ -92,31 +90,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Clone the resource to avoid mutating the original
-    const resourceToCreate = { ...action.resource } as any;
+    const resourceToCreate = { ...action.resource };
 
-    // Attach patient reference - different resource types use different properties
-    if (resourceType === 'QuestionnaireResponse') {
-      // QuestionnaireResponse uses 'source' and 'subject' for patient reference
-      resourceToCreate.subject = {
-        reference: `Patient/${patientId}`,
-        display: undefined,
-      };
-      resourceToCreate.source = {
-        reference: `Patient/${patientId}`,
-      };
-      // Ensure status is "completed" for QuestionnaireResponse
-      resourceToCreate.status = 'completed';
-    } else {
-      // MedicationRequest and ServiceRequest use 'subject'
-      resourceToCreate.subject = {
-        reference: `Patient/${patientId}`,
-        display: undefined, // Will be populated by Medplum if patient exists
-      };
-      // Ensure status is "draft" for doctor review workflow
-      resourceToCreate.status = 'draft';
-      // Ensure intent is "order" (standard for prescriptions/orders)
-      resourceToCreate.intent = 'order';
-    }
+    // Attach patient reference to the resource
+    // This links the order/request to the specific patient
+    resourceToCreate.subject = {
+      reference: `Patient/${patientId}`,
+      display: undefined, // Will be populated by Medplum if patient exists
+    };
+
+    // Ensure status is "draft" for doctor review workflow
+    resourceToCreate.status = 'draft';
+
+    // Ensure intent is "order" (standard for prescriptions/orders)
+    resourceToCreate.intent = 'order';
 
     console.log('[Execute] Creating resource in Medplum:', {
       resourceType,
