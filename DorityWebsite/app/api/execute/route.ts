@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { MedicationRequest, ServiceRequest, Appointment, Resource } from '@medplum/fhirtypes';
+import { MedicationRequest, ServiceRequest, Appointment, QuestionnaireResponse, Resource } from '@medplum/fhirtypes';
 import { getMedplumClient } from '@/lib/medplum-client';
 import sgMail from '@sendgrid/mail';
 
@@ -8,9 +8,9 @@ import sgMail from '@sendgrid/mail';
  */
 interface ExecuteRequest {
   action: {
-    type: 'medication' | 'lab' | 'imaging' | 'referral' | 'followup' | 'scheduling';
+    type: 'medication' | 'lab' | 'imaging' | 'referral' | 'followup' | 'scheduling' | 'questionnaire_response';
     description: string;
-    resource: MedicationRequest | ServiceRequest | Appointment;
+    resource: MedicationRequest | ServiceRequest | Appointment | QuestionnaireResponse;
     email?: string; // For scheduling
     subject?: string; // For scheduling
     body?: string; // For scheduling
@@ -150,10 +150,10 @@ export async function POST(request: NextRequest) {
     
     // Re-validate after potential conversion
     const finalResourceType = action.resource.resourceType;
-    if (finalResourceType !== 'MedicationRequest' && finalResourceType !== 'ServiceRequest' && finalResourceType !== 'Appointment') {
+    if (finalResourceType !== 'MedicationRequest' && finalResourceType !== 'ServiceRequest' && finalResourceType !== 'Appointment' && finalResourceType !== 'QuestionnaireResponse') {
       return NextResponse.json(
         { 
-          error: `Invalid resource type: ${finalResourceType}. Expected MedicationRequest, ServiceRequest, or Appointment, Failed to create resource in Medplum` 
+          error: `Invalid resource type: ${finalResourceType}. Expected MedicationRequest, ServiceRequest, Appointment, or QuestionnaireResponse, Failed to create resource in Medplum` 
         },
         { status: 400 }
       );
@@ -246,6 +246,16 @@ export async function POST(request: NextRequest) {
             delete resourceToCreate.end;
             console.log('[Execute] Removed start/end from Appointment (neither specified)');
         }
+    } else if (finalResourceType === 'QuestionnaireResponse') {
+        // For QuestionnaireResponse, patient is subject and source
+        resourceToCreate.subject = {
+            reference: `Patient/${patientId}`,
+            display: undefined, 
+        };
+        resourceToCreate.source = {
+            reference: `Patient/${patientId}`,
+            display: undefined,
+        };
     } else {
         // For MedicationRequest/ServiceRequest, patient is subject
         resourceToCreate.subject = {
@@ -257,6 +267,12 @@ export async function POST(request: NextRequest) {
     // Ensure status is "draft" or "proposed"
     if (finalResourceType === 'Appointment') {
         resourceToCreate.status = 'proposed';
+    } else if (finalResourceType === 'QuestionnaireResponse') {
+        // QuestionnaireResponse usually 'completed' or 'in-progress'
+        // If not set, default to 'completed' since these are historical/screening
+        if (!resourceToCreate.status) {
+            resourceToCreate.status = 'completed';
+        }
     } else {
         resourceToCreate.status = 'draft';
         resourceToCreate.intent = 'order';

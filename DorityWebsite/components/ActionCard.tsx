@@ -413,25 +413,8 @@ export default function ActionCard({ action }: ActionCardProps) {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 mt-4">
-            {/* Special View/Edit buttons for Scheduling */}
-            {action.type === 'scheduling' ? (
-                <>
-                    <button
-                    onClick={() => setShowForm(!showForm)}
-                    className="px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100/80 rounded-lg transition-all border border-zinc-200/70 flex items-center gap-1.5"
-                    >
-                    <Mail className="w-3.5 h-3.5" />
-                    {showForm ? "Hide" : "View"} Email
-                    </button>
-                    <button
-                    onClick={handleOpenFormModal}
-                    className="px-3 py-1.5 text-xs font-medium text-[#7C2D3E] hover:text-white hover:bg-[#7C2D3E] rounded-lg transition-all border border-[#7C2D3E] flex items-center gap-1.5"
-                    >
-                    <FileEdit className="w-3.5 h-3.5" />
-                    Edit Email
-                    </button>
-                </>
-            ) : (
+            {/* View/Edit buttons for non-scheduling actions */}
+            {action.type !== 'scheduling' && (
                 <>
                     <button
                     onClick={() => setShowForm(!showForm)}

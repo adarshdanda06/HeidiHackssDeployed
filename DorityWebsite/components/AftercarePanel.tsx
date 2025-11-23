@@ -7,10 +7,11 @@ import { useSession } from "@/contexts/SessionContext";
 export default function AftercarePanel() {
   const {
     patient,
-    patientSelection,
     approvedActions,
     aftercareSummary,
     setAftercareSummary,
+    aftercareSubject,
+    setAftercareSubject,
     generateAftercare,
     sendAftercare,
     isLoading,
@@ -105,7 +106,20 @@ export default function AftercarePanel() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="patient@email.com"
+              placeholder="adarsh.danda1@gmail.com"
+              className="w-full px-3.5 py-2.5 bg-white border border-zinc-200/70 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7C2D3E]/20 focus:border-[#7C2D3E]/30 text-sm transition-all placeholder:text-zinc-400"
+            />
+          </div>
+
+          {/* Subject Line */}
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-zinc-700 mb-2">
+              Subject Line
+            </label>
+            <input
+              type="text"
+              value={aftercareSubject}
+              onChange={(e) => setAftercareSubject(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-white border border-zinc-200/70 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7C2D3E]/20 focus:border-[#7C2D3E]/30 text-sm transition-all placeholder:text-zinc-400"
             />
           </div>
@@ -200,7 +214,7 @@ export default function AftercarePanel() {
                     <strong>From:</strong> noreply@clinicalactionlayer.com
                   </p>
                   <p>
-                    <strong>Subject:</strong> After-Care Summary from Your Recent Visit
+                    <strong>Subject:</strong> {aftercareSubject || "Your Visit Summary"}
                   </p>
                 </div>
                 <div className="border-t border-zinc-200/70 pt-4">

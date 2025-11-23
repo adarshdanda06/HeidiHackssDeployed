@@ -41,7 +41,9 @@ export default function ActionList() {
   }
 
   // Group actions by category
-  const groupedActions = suggestedActions.reduce((acc, action) => {
+  const groupedActions = suggestedActions
+    .filter(action => action.type !== 'scheduling') // Hide scheduling actions as they are handled in Aftercare
+    .reduce((acc, action) => {
     const category = action.categoryLabel || "Other";
     if (!acc[category]) {
       acc[category] = [];

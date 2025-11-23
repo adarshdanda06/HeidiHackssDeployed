@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
     const referrals = approvedActions.filter((a: any) => a.type === "referral");
     const followups = approvedActions.filter((a: any) => a.type === "followup");
     const scheduling = approvedActions.filter((a: any) => a.type === "scheduling");
+    const aftercareInstructions = approvedActions.filter((a: any) => a.type === "aftercare");
+    const questionnaires = approvedActions.filter((a: any) => a.type === "questionnaire_response");
 
     const actionsContext = JSON.stringify({
       medications,
@@ -29,30 +31,38 @@ export async function POST(request: NextRequest) {
       imaging,
       referrals,
       followups,
-      scheduling
+      scheduling,
+      aftercareInstructions,
+      questionnaires
     }, null, 2);
 
     const organizationName = patient?.generalPractitioner || "your organization/practitioner";
     const organizationAddress = patient?.organizationAddress || patient?.address || "the address on file";
 
     const systemPrompt = `You are a helpful medical assistant drafting a patient after-visit summary email.
-Your goal is to create a SINGLE, WARM, and USER-FRIENDLY email that consolidates all information:
-1. A friendly opening acknowledging the visit.
-2. A summary of what was discussed (using the transcript for context).
-3. Clear instructions for next steps (medications, labs, referrals).
-4. IMPORTANT: If there are any "scheduling" actions (like follow-up meetings), integrate them naturally into the email. 
-   - Do NOT use robotic headers like "New Meeting Request" or "Reason: ...". 
-   - Instead, say something like "We'd like to schedule a follow-up to discuss X, ideally next Tuesday."
-   - Use the "reason" and "when" fields from the scheduling action to write this naturally.
-5. A friendly closing.
-6. Mention the patient's organization/practitioner and include the location where they can be reached.
-7. End the email by reminding the patient that ${organizationName} is located at ${organizationAddress}.
+    Your goal is to create a SINGLE, WARM, and USER-FRIENDLY email that consolidates all information:
+    1. A friendly opening acknowledging the visit.
+    2. A summary of what was discussed (using the transcript for context).
+    3. Clear instructions for next steps. You MUST include all approved actions provided in the context:
+       - Medications: List new or changed medications with instructions.
+       - Labs/Imaging: Explain what tests are ordered and why.
+       - Referrals: Mention any specialists they need to see.
+       - Aftercare Instructions: Include any specific home care advice.
+       - Screenings: Mention any questionnaires or screenings completed (e.g. PHQ-4).
+       - Follow-ups: Mention any follow-up appointments or check-ins.
+    4. IMPORTANT: If there are any "scheduling" actions (like follow-up meetings):
+       - If the action has a "body" field, INCORPORATE that text into the email.
+       - If the action has a "subject" field, use it or a similar friendly version as the email subject.
+       - Otherwise, integrate the request naturally (e.g. "We'd like to schedule a follow-up to discuss X, ideally next Tuesday.").
+    5. A friendly closing.
+    6. Mention the patient's organization/practitioner and include the location where they can be reached.
+    7. End the email by reminding the patient that ${organizationName} is located at ${organizationAddress}.
 
-Output purely a JSON object with two keys:
-- "subject": A user-friendly email subject line.
-- "body": The full email body text.
+    Output purely a JSON object with two keys:
+    - "subject": A user-friendly email subject line.
+    - "body": The full email body text (use \\n for newlines).
 
-Do not use markdown for the JSON. Just raw JSON.`;
+    Do not use markdown for the JSON. Just raw JSON.`;
 
     const patientContext = patient
       ? `Patient: ${patient.name}
@@ -80,7 +90,7 @@ Please draft the email.
 ${reminderInstruction}`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-5-20250929",
       max_tokens: 2000,
       system: systemPrompt,
       messages: [
@@ -92,7 +102,9 @@ ${reminderInstruction}`;
     let generatedEmail;
     
     try {
-      generatedEmail = JSON.parse(content.trim());
+      // specific clean-up for markdown json blocks
+      const cleanContent = content.trim().replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      generatedEmail = JSON.parse(cleanContent);
     } catch (e) {
       // Fallback if JSON parse fails
       console.error("Failed to parse Claude response:", content);
@@ -103,15 +115,13 @@ ${reminderInstruction}`;
     }
 
     // Combine subject and body for the frontend editor
-    // The frontend likely expects a single string for the "summary" field.
-    // We will format it so the user can see the subject.
     const reminderNote = `P.S. ${organizationName} is located at ${organizationAddress}.`;
     const bodyWithReminder = `${generatedEmail.body}\n\n${reminderNote}`;
 
-    const combinedSummary = `Subject: ${generatedEmail.subject}\n\n${bodyWithReminder}`;
-    console.log('Combined Summary:', combinedSummary);
+    console.log('Generated Summary:', generatedEmail);
     return NextResponse.json({
-      aftercareSummary: combinedSummary,
+      subject: generatedEmail.subject,
+      body: bodyWithReminder,
     });
 
   } catch (error) {

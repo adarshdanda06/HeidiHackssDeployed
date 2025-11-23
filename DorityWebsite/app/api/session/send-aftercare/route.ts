@@ -3,13 +3,14 @@ import sgMail from '@sendgrid/mail';
 
 export async function POST(request: NextRequest) {
   try {
-    const { sessionId, email, summary } = await request.json();
+    const { sessionId, email, summary, subject: subjectParam } = await request.json();
 
     // Parse Subject and Body from summary if possible
-    let subject = "Your Visit Summary";
+    let subject = subjectParam || "Your Visit Summary";
     let body = summary;
 
-    if (summary.startsWith("Subject:")) {
+    // Backward compatibility: try to parse subject from summary if not provided
+    if (!subjectParam && summary.startsWith("Subject:")) {
       const parts = summary.split("\n\n");
       if (parts.length >= 2) {
         const subjectLine = parts[0];

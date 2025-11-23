@@ -69,6 +69,7 @@ interface SessionState {
   suggestedActions: SuggestedAction[];
   approvedActions: SuggestedAction[];
   aftercareSummary: string;
+  aftercareSubject: string;
   isLoading: {
     startSession: boolean;
     analyze: boolean;
@@ -82,6 +83,7 @@ interface SessionContextType extends SessionState {
   setCurrentStep: (step: 1 | 2 | 3 | 4) => void;
   setTranscript: (transcript: string) => void;
   setAftercareSummary: (summary: string) => void;
+  setAftercareSubject: (subject: string) => void;
   startSession: (patientId: string, patientSelection?: PatientSelection) => Promise<void>;
   analyzeTranscript: () => Promise<void>;
   updateActionStatus: (actionId: string, status: "pending" | "approved" | "rejected") => void;
@@ -103,6 +105,7 @@ const initialState: SessionState = {
   suggestedActions: [],
   approvedActions: [],
   aftercareSummary: "",
+  aftercareSubject: "",
   isLoading: {
     startSession: false,
     analyze: false,
@@ -125,6 +128,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const setAftercareSummary = useCallback((summary: string) => {
     setState((prev) => ({ ...prev, aftercareSummary: summary }));
+  }, []);
+
+  const setAftercareSubject = useCallback((subject: string) => {
+    setState((prev) => ({ ...prev, aftercareSubject: subject }));
   }, []);
 
   const clearError = useCallback(() => {
@@ -375,7 +382,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       setState((prev) => ({
         ...prev,
-        aftercareSummary: data.aftercareSummary || "",
+        aftercareSummary: data.body || data.aftercareSummary || "",
+        aftercareSubject: data.subject || "Visit Summary",
         isLoading: { ...prev.isLoading, aftercare: false },
       }));
     } catch (error) {
@@ -408,6 +416,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             sessionId: state.sessionId,
             email,
             summary: state.aftercareSummary,
+            subject: state.aftercareSubject,
           }),
         });
 
@@ -435,6 +444,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setCurrentStep,
     setTranscript,
     setAftercareSummary,
+    setAftercareSubject,
     startSession,
     analyzeTranscript,
     updateActionStatus,
