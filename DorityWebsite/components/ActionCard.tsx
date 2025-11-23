@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Pill, Stethoscope, Image, FlaskConical, UserPlus, Calendar, FileText, AlertTriangle, CheckCircle2, Check, X, FileEdit, XCircle, Mail, Send } from "lucide-react";
+import { Pill, Stethoscope, Image, FlaskConical, UserPlus, Calendar, FileText, AlertTriangle, CheckCircle2, Check, X, FileEdit, XCircle, Mail, Send, MapPin, Loader2 } from "lucide-react";
 import { useSession, type SuggestedAction } from "@/contexts/SessionContext";
 import QuestionnaireForm from "./QuestionnaireForm";
 import { calculateCompletionPercentage as calcCompletion } from "@/lib/completion-utils";
@@ -225,6 +225,59 @@ export default function ActionCard({ action }: ActionCardProps) {
   const [showFormModal, setShowFormModal] = useState(false);
   const [isEditingForm, setIsEditingForm] = useState(false);
   const [questionnaireDef, setQuestionnaireDef] = useState<any>(null);
+  const [practitioners, setPractitioners] = useState<any[]>([]);
+  const [isLoadingPractitioners, setIsLoadingPractitioners] = useState(false);
+  const [showPractitionerSearch, setShowPractitionerSearch] = useState(false);
+
+  // Helper to search for practitioners
+  const searchPractitioners = async () => {
+    setIsLoadingPractitioners(true);
+    setShowPractitionerSearch(true);
+    try {
+      // Try to parse city/state from patient address
+      // Format assumption: "123 Main St, City, State Zip"
+      let city = '';
+      let state = '';
+      
+      if (patient?.address) {
+        const parts = patient.address.split(',');
+        if (parts.length >= 2) {
+          // Last part usually has State Zip
+          const stateZip = parts[parts.length - 1].trim().split(' ');
+          if (stateZip.length >= 1) {
+            state = stateZip[0];
+          }
+          // Second to last is usually City
+          city = parts[parts.length - 2].trim();
+        }
+      }
+
+      const params = new URLSearchParams();
+      if (city) params.append('city', city);
+      if (state) params.append('state', state);
+      
+      // Use action title for specialty, cleaning up common words
+      const specialty = action.title
+        .replace(/Referral|Consult|Request|Order/gi, '')
+        .trim();
+      if (specialty) params.append('specialty', specialty);
+      
+      params.append('limit', '5');
+
+      const response = await fetch(`/api/find-practitioners?${params.toString()}`);
+      const data = await response.json();
+      
+      if (data.results) {
+        setPractitioners(data.results);
+      } else {
+        setPractitioners([]);
+      }
+    } catch (error) {
+      console.error("Failed to search practitioners", error);
+    } finally {
+      setIsLoadingPractitioners(false);
+    }
+  };
 
   // Fetch questionnaire definition to know which fields are required
   useEffect(() => {
@@ -706,7 +759,11 @@ export default function ActionCard({ action }: ActionCardProps) {
                   <FormField label="Specialty / Service" value={action.title} />
                   <FormField label="Reason for Referral" value={action.details} />
                   <FormField label="Urgency" value="Routine (within 2-4 weeks)" />
-                  <FormField label="Specific Provider Requested" value="No preference" />
+                  <FormField 
+                    label="Specific Provider Requested" 
+                    value={formData.performer?.display || "No preference"} 
+                    isItalic={!!formData.performer?.display}
+                  />
                   <FormField label="Clinical Summary" value={action.rationale} isItalic />
                   <FormField label="Relevant Diagnoses" value="See patient problem list" />
                   <FormField label="Current Medications" value="See current medication list" />
@@ -1053,6 +1110,65 @@ export default function ActionCard({ action }: ActionCardProps) {
                   <div className="space-y-3">
                     <FormField label="Specialty / Service" value={action.title} isEditable={true} />
                     <FormField label="Reason for Referral" value={action.details} isEditable={true} fieldType="textarea" />
+                    
+                    {/* Provider Search */}
+                    <div className="p-2.5 bg-white border border-zinc-200/50 rounded-lg">
+                      <label className="block text-xs font-semibold text-zinc-700 mb-1.5">Specific Provider Requested</label>
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={formData.performer?.display || ''}
+                          onChange={(e) => setFormData({...formData, performer: { display: e.target.value, reference: null }})}
+                          placeholder="No preference"
+                          className="flex-1 text-xs text-zinc-600 border border-zinc-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#7C2D3E]/20 focus:border-[#7C2D3E]/30"
+                        />
+                        <button
+                          onClick={searchPractitioners}
+                          disabled={isLoadingPractitioners}
+                          className="px-3 py-1.5 text-xs font-medium text-white bg-[#7C2D3E] hover:bg-[#5A1F2D] rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {isLoadingPractitioners ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
+                          Find Local
+                        </button>
+                      </div>
+                      
+                      {/* Search Results */}
+                      {showPractitionerSearch && practitioners.length > 0 && (
+                        <div className="mt-2 border border-zinc-200 rounded-lg overflow-hidden max-h-40 overflow-y-auto bg-zinc-50/50">
+                          {practitioners.map((p, i) => (
+                            <div 
+                              key={i}
+                              onClick={() => {
+                                const name = `${p.basic.name_prefix || ''} ${p.basic.first_name} ${p.basic.last_name} ${p.basic.credential || ''}`.trim();
+                                const address = p.addresses[0] ? `${p.addresses[0].address_1}, ${p.addresses[0].city}, ${p.addresses[0].state}` : '';
+                                setFormData({
+                                  ...formData, 
+                                  performer: { 
+                                    display: `${name} - ${address}`,
+                                    reference: `Practitioner/${p.number}` // NPI number
+                                  }
+                                });
+                                setShowPractitionerSearch(false);
+                              }}
+                              className="p-2.5 hover:bg-white hover:shadow-sm cursor-pointer border-b border-zinc-100 last:border-0 text-xs transition-all"
+                            >
+                              <div className="font-medium text-zinc-900">
+                                {p.basic.name_prefix} {p.basic.first_name} {p.basic.last_name} {p.basic.credential}
+                              </div>
+                              <div className="text-zinc-500 truncate mt-0.5">
+                                {p.taxonomies?.[0]?.desc} • {p.addresses?.[0]?.city}, {p.addresses?.[0]?.state}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {showPractitionerSearch && practitioners.length === 0 && !isLoadingPractitioners && (
+                         <div className="mt-2 text-xs text-zinc-500 italic p-2">
+                           No local practitioners found for this specialty.
+                         </div>
+                      )}
+                    </div>
+
                     <FormField label="Urgency" value="Routine (within 2-4 weeks)" isEditable={true} />
                     <FormField label="Clinical Summary" value={action.rationale} isItalic isEditable={true} fieldType="textarea" />
                   </div>

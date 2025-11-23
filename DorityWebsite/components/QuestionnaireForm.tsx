@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Questionnaire, QuestionnaireItem } from "@medplum/fhirtypes";
-import { Loader2 } from "lucide-react";
+import { Loader2, MapPin } from "lucide-react";
 import { mapFHIRToQuestionnaireResponses } from "@/lib/questionnaireMapper";
 
 interface QuestionnaireFormProps {
@@ -20,6 +20,7 @@ interface QuestionnaireItemRendererProps {
   value: any;
   onChange: (linkId: string, value: any) => void;
   depth?: number;
+  patientData?: any;
 }
 
 function QuestionnaireItemRenderer({
@@ -27,13 +28,80 @@ function QuestionnaireItemRenderer({
   isEditable,
   value,
   onChange,
-  depth = 0
+  depth = 0,
+  patientData
 }: QuestionnaireItemRendererProps) {
   const isRequired = item.required === true;
   const linkId = item.linkId || '';
   
   // Get the actual value for this item from the flat responses object
   const itemValue = value?.[linkId];
+  
+  // Provider Search State
+  const [practitioners, setPractitioners] = useState<any[]>([]);
+  const [isLoadingPractitioners, setIsLoadingPractitioners] = useState(false);
+  const [showPractitionerSearch, setShowPractitionerSearch] = useState(false);
+
+  // Identify provider fields
+  const isProviderField = (
+    (item.text?.toLowerCase().includes('doctor') || 
+     // Check for 'clinic' but exclude 'clinical'
+     (item.text?.toLowerCase().includes('clinic') && !item.text?.toLowerCase().includes('clinical')) ||
+     item.linkId?.toLowerCase().includes('provider') ||
+     item.linkId?.toLowerCase().includes('performer')) && 
+    (item.type === 'string' || item.type === 'text' || item.type === 'reference') &&
+    // Explicitly exclude reason/indication fields just in case
+    !item.text?.toLowerCase().includes('reason') &&
+    !item.linkId?.toLowerCase().includes('reason')
+  );
+
+  const searchPractitioners = async () => {
+    setIsLoadingPractitioners(true);
+    setShowPractitionerSearch(true);
+    try {
+      // Try to parse city/state from patient address
+      let city = '';
+      let state = '';
+      
+      if (patientData?.address) {
+        const parts = patientData.address.split(',');
+        if (parts.length >= 2) {
+          const stateZip = parts[parts.length - 1].trim().split(' ');
+          if (stateZip.length >= 1) state = stateZip[0];
+          city = parts[parts.length - 2].trim();
+        }
+      }
+
+      // Try to find specialty from other form fields
+      let specialty = '';
+      if (value) {
+        // Look for keys containing 'specialty'
+        const specialtyKey = Object.keys(value).find(k => k.toLowerCase().includes('specialty'));
+        if (specialtyKey && value[specialtyKey]) {
+          specialty = value[specialtyKey];
+        }
+      }
+
+      const params = new URLSearchParams();
+      if (city) params.append('city', city);
+      if (state) params.append('state', state);
+      if (specialty) params.append('specialty', specialty);
+      params.append('limit', '5');
+
+      const response = await fetch(`/api/find-practitioners?${params.toString()}`);
+      const data = await response.json();
+      
+      if (data.results) {
+        setPractitioners(data.results);
+      } else {
+        setPractitioners([]);
+      }
+    } catch (error) {
+      console.error("Failed to search practitioners", error);
+    } finally {
+      setIsLoadingPractitioners(false);
+    }
+  };
   
   // Debug log to see what values we're rendering - SPECIAL CHECK FOR MEDICATION
   if (linkId === 'medication-name' || linkId === 'medication' || item.text?.toLowerCase().includes('medication')) {
@@ -68,6 +136,67 @@ function QuestionnaireItemRenderer({
         isEditable,
         needsAttention
       });
+    }
+
+    // Custom Provider Search UI
+    if (isProviderField && isEditable) {
+      return (
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={itemValue || ''}
+              onChange={(e) => onChange(linkId, e.target.value)}
+              disabled={!isEditable}
+              className={`flex-1 text-xs text-zinc-600 border rounded px-2 py-1.5 focus:outline-none focus:ring-2 disabled:bg-zinc-50 disabled:text-zinc-500 ${
+                needsAttention 
+                  ? 'border-amber-300 bg-amber-50/30 focus:ring-amber-500/20 focus:border-amber-500/30' 
+                  : 'border-zinc-200 focus:ring-[#7C2D3E]/20 focus:border-[#7C2D3E]/30'
+              }`}
+              placeholder={needsAttention ? 'Required field - please complete' : (item.text || "Enter provider name")}
+            />
+            <button
+              onClick={searchPractitioners}
+              disabled={isLoadingPractitioners}
+              type="button" // Prevent form submission
+              className="px-3 py-1.5 text-xs font-medium text-white bg-[#7C2D3E] hover:bg-[#5A1F2D] rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap"
+            >
+              {isLoadingPractitioners ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
+              Find Local
+            </button>
+          </div>
+          
+          {/* Search Results */}
+          {showPractitionerSearch && practitioners.length > 0 && (
+            <div className="border border-zinc-200 rounded-lg overflow-hidden max-h-40 overflow-y-auto bg-zinc-50/50">
+              {practitioners.map((p, i) => (
+                <div 
+                  key={i}
+                  onClick={() => {
+                    const name = `${p.basic.name_prefix || ''} ${p.basic.first_name} ${p.basic.last_name} ${p.basic.credential || ''}`.trim();
+                    const address = p.addresses[0] ? `${p.addresses[0].address_1}, ${p.addresses[0].city}, ${p.addresses[0].state}` : '';
+                    onChange(linkId, `${name} - ${address} (NPI: ${p.number})`);
+                    setShowPractitionerSearch(false);
+                  }}
+                  className="p-2.5 hover:bg-white hover:shadow-sm cursor-pointer border-b border-zinc-100 last:border-0 text-xs transition-all"
+                >
+                  <div className="font-medium text-zinc-900">
+                    {p.basic.name_prefix} {p.basic.first_name} {p.basic.last_name} {p.basic.credential}
+                  </div>
+                  <div className="text-zinc-500 truncate mt-0.5">
+                    {p.taxonomies?.[0]?.desc} • {p.addresses?.[0]?.city}, {p.addresses?.[0]?.state}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {showPractitionerSearch && practitioners.length === 0 && !isLoadingPractitioners && (
+             <div className="text-xs text-zinc-500 italic p-1">
+               No local practitioners found. Try manually entering the name.
+             </div>
+          )}
+        </div>
+      );
     }
     
     switch (item.type) {
@@ -235,6 +364,7 @@ function QuestionnaireItemRenderer({
             value={value}
             onChange={onChange}
             depth={depth + 1}
+            patientData={patientData}
           />
         ))}
       </div>
@@ -465,6 +595,7 @@ export default function QuestionnaireForm({
             isEditable={isEditable}
             value={responses}
             onChange={handleResponseChange}
+            patientData={patientData}
           />
         ))}
       </div>
