@@ -115,23 +115,6 @@ export default function HeidiTranscriptFetcher({ onTranscriptFetched, disabled }
 
   return (
     <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200/50 rounded-xl p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ExternalLink className="w-4 h-4 text-purple-600" />
-          <h3 className="text-sm font-semibold text-purple-900">Fetch from Heidi API</h3>
-        </div>
-        {success && (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/50">
-            <Check className="w-3 h-3" />
-            Loaded
-          </span>
-        )}
-      </div>
-
-      <p className="text-xs text-purple-700">
-        Load a consultation transcript from Heidi Health's API
-      </p>
-
       {sessions.length === 0 && !isLoadingSessions && (
         <button
           onClick={loadSessions}
@@ -173,12 +156,19 @@ export default function HeidiTranscriptFetcher({ onTranscriptFetched, disabled }
           <button
             onClick={fetchTranscript}
             disabled={disabled || isLoadingTranscript || !selectedSessionId}
-            className="w-full px-3 py-2.5 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
+            className={`w-full px-3 py-2.5 text-sm font-semibold text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm ${
+              success ? "bg-emerald-600 hover:bg-emerald-700" : "bg-purple-600 hover:bg-purple-700"
+            }`}
           >
             {isLoadingTranscript ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Fetching...
+              </>
+            ) : success ? (
+              <>
+                <Check className="w-4 h-4" />
+                Transcript Loaded
               </>
             ) : (
               <>

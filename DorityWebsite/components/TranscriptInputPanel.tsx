@@ -38,9 +38,6 @@ export default function TranscriptInputPanel() {
       {/* Header */}
       <div className="mb-4">
         <h2 className="text-sm font-semibold text-zinc-900 mb-1">Session Transcript</h2>
-        <p className="text-xs text-zinc-600">
-          Fetch from Heidi API or paste/type the consultation transcript
-        </p>
       </div>
 
       {isDisabled && (
@@ -62,18 +59,6 @@ export default function TranscriptInputPanel() {
             onTranscriptFetched={handleTranscriptFetched}
             disabled={isDisabled || isLoading.analyze}
           />
-        </div>
-      )}
-
-      {/* Divider */}
-      {!isDisabled && (
-        <div className="relative mb-4">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-zinc-200"></div>
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-zinc-500">Or manually enter</span>
-          </div>
         </div>
       )}
 
