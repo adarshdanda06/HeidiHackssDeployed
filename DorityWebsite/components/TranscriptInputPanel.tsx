@@ -2,6 +2,7 @@
 
 import { FileText, Loader2, Sparkles, CheckCircle2 } from "lucide-react";
 import { useSession } from "@/contexts/SessionContext";
+import HeidiTranscriptFetcher from "./HeidiTranscriptFetcher";
 
 export default function TranscriptInputPanel() {
   const {
@@ -19,6 +20,15 @@ export default function TranscriptInputPanel() {
     await analyzeTranscript();
   };
 
+  const handleTranscriptFetched = (fetchedTranscript: string, metadata?: any) => {
+    setTranscript(fetchedTranscript);
+    
+    // Optional: Show a success message or metadata
+    if (metadata) {
+      console.log('Transcript metadata:', metadata);
+    }
+  };
+
   const isDisabled = !patient;
   const charCount = transcript.length;
   const hasContent = transcript.trim().length > 20; // Minimum threshold
@@ -29,7 +39,7 @@ export default function TranscriptInputPanel() {
       <div className="mb-4">
         <h2 className="text-sm font-semibold text-zinc-900 mb-1">Session Transcript</h2>
         <p className="text-xs text-zinc-600">
-          Paste or type the consultation transcript
+          Fetch from Heidi API or paste/type the consultation transcript
         </p>
       </div>
 
@@ -41,6 +51,28 @@ export default function TranscriptInputPanel() {
             <p className="text-xs text-amber-700 mt-0.5">
               Search and select a patient on the left first
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Heidi API Fetcher */}
+      {!isDisabled && (
+        <div className="mb-4">
+          <HeidiTranscriptFetcher 
+            onTranscriptFetched={handleTranscriptFetched}
+            disabled={isDisabled || isLoading.analyze}
+          />
+        </div>
+      )}
+
+      {/* Divider */}
+      {!isDisabled && (
+        <div className="relative mb-4">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-zinc-200"></div>
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-2 text-zinc-500">Or manually enter</span>
           </div>
         </div>
       )}
